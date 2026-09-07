@@ -8,7 +8,10 @@
 /**
  * @typedef {Object} ExpandOptions
  * @property {number} [maxBatches] Hard cap on iterations (default 40).
- * @property {number} [batchDelayMs] Settle time per batch (default 800).
+ * @property {number} [batchDelayMs] Settle time per batch (default 1500).
+ * @property {number} [maxIdleBatches] Give up after this many batches
+ *   without growth (default 4). Separate from maxBatches so patience
+ *   against slow chunks is tunable without raising the hard cap.
  * @property {number} [maxTweets] Stop once this many tweets load (default 300).
  * @property {() => boolean} [shouldStop] Cooperative cancel hook.
  */
@@ -53,7 +56,8 @@ async function expandAndScroll(root, options = {}, onProgress) {
 	const doc = root ?? document;
 	const {
 		maxBatches = 40,
-		batchDelayMs = 800,
+		batchDelayMs = 1500,
+		maxIdleBatches = 4,
 		maxTweets = 300,
 		shouldStop = () => false,
 	} = options;
@@ -81,7 +85,7 @@ async function expandAndScroll(root, options = {}, onProgress) {
 		}
 		idleBatches = stats.tweets > previous ? 0 : idleBatches + 1;
 		previous = stats.tweets;
-		if (idleBatches >= 2) {
+		if (idleBatches >= maxIdleBatches) {
 			stats.stoppedWhy = "idle";
 			break;
 		}

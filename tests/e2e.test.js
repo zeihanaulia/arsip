@@ -149,6 +149,28 @@ describe("x-adapter (real Chromium)", () => {
 		assert.equal(after, 2);
 	});
 
+	it("waits out a slow chunk instead of quitting while idle", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-expand-slow.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/scroller.js") });
+
+		const stats = await page.evaluate(() =>
+			globalThis.XScroller.expandAndScroll(document),
+		);
+		const after = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets.length,
+		);
+
+		assert.equal(after, 2);
+		assert.equal(stats.stoppedWhy, "idle");
+	});
+
 	it("parses compact counts like 1.2K without guessing the rest", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
