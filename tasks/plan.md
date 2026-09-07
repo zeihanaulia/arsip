@@ -117,6 +117,32 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 **Estimated scope:** Medium (3 files)
 
+## Task 3b: Tuning completeness + observabilitas + styling dasar popup
+
+**Description:** Tindak lanjut observasi thread nyata (16/292): kalibrasi kesabaran scroller ke timing chunk X yang malas, tampilkan alasan berhenti di popup agar tiap percobaan bisa dibaca, dan kasih styling dasar ke popup yang sekarang mentah (slice awal Task 7, final UI tetap di Task 7).
+
+**Acceptance criteria:**
+- [ ] Scroller tahan chunk lambat: fixture yang append setelah 2.5 dtk tetap ke-capture dengan default options (idle tolerance jadi parameter `maxIdleBatches`, default 4; `batchDelayMs` default 1500ms)
+- [ ] Status popup menampilkan alasan berhenti (`idle` / `max-batches` / `max-tweets` / `cancelled`) + jumlah batch, bukan cuma count
+- [ ] Popup punya styling dasar yang rapi: tombol full-width, spacing konsisten, status `role="status"`, label untuk checkbox, kontras cukup, keyboard-navigable (native elements + focus visible)
+- [ ] Tidak ada console error saat popup dibuka; wiring (download → polling → cancel) covered test UI
+
+**Verification:**
+- [ ] E2E slow-fixture hijau (RED dulu lawan default lama)
+- [ ] UI test Playwright hijau (stub `chrome.*`, tidak ada console error)
+- [ ] Screenshot popup headed dicek manual
+- [ ] Manual check di thread nyata yang sama: count naik vs 16 + `stoppedWhy` terbaca
+
+**Dependencies:** Task 3
+
+**Files likely touched:**
+- `src/scroller.js` (`maxIdleBatches`, defaults 1500ms/4)
+- `src/content.js` (teruskan stats akhir), `src/background.js` (cache `stoppedWhy`)
+- `src/popup.html`, `src/popup.css` (baru), `src/popup.js` (tampilkan alasan + wiring test)
+- `tests/fixtures/thread-expand-slow.html` (baru), `tests/e2e.test.js`, `tests/popup-ui.test.js` (baru)
+
+**Estimated scope:** Medium (4-5 files)
+
 ## Task 4: Media inventory + download lokal + bundle ZIP
 
 **Description:** Dari snapshot, inventarisir media (images, GIF, video poster + varian terbaik yang bisa di-fetch sebagai blob), download via content script (agar ikut sesi/login tab), simpan sebagai `media/<tweetId>-<idx>.<ext>`, rewrite referensi ke path lokal, bundle jadi ZIP siap upload.
