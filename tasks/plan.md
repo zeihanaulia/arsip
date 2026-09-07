@@ -106,7 +106,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 **Verification:**
 - [x] Manual check di 1 thread panjang (50+ replies): bandingkan count ON vs OFF, cek tidak hang (stop < 60 dtk atau sampai habis)
-- [ ] Manual check cancel mid-scroll tidak merusak snapshot parsial (tetap bisa download)
+- [x] Manual check cancel mid-scroll tidak merusak snapshot parsial (tetap bisa download)
 
 **Dependencies:** Task 2
 
