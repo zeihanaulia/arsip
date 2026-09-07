@@ -3,3 +3,4 @@
 | No. | Topic | Central question | Summary |
 |---:|---|---|---|
 | 001 | [Kenapa Extension Chrome Bukan Webapp Biasa](./001-chrome-extension-bukan-webapp-biasa.md) | Kalau bahannya sama (HTML/CSS/JS), kenapa approach-nya beda dari webapp? | Menelusuri tiga bug lokasi dari project x-downloader sampai ke model banyak-konteks-terisolasi + bus pesan, isolated world, dan kenapa MV3 mempersempit kapan/di mana/dari mana code boleh jalan. |
+| 002 | [Kenapa Test Hijau Tapi Browser Merah](./002-kenapa-test-hijau-browser-merah.md) | Kenapa 31/31 test hijau tapi browser beneran gagal dua kali? | Retrospektif Task 2: hang channel pesan dan createObjectURL di service worker, sampai ke persamaan kebenaran extension (logic × konteks × channel) dan strategi test per sumbunya. |
