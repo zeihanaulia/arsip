@@ -10,6 +10,7 @@ import {
 	captionsToText,
 	enrichSnapshotMedia,
 	filenameForSnapshot,
+	isRootCaptured,
 	separateDirForArchive,
 	snapshotToDataUrl,
 	splitMediaForMode,
@@ -303,6 +304,30 @@ describe("enrichSnapshotMedia", () => {
 		enrichSnapshotMedia(snapshot, []);
 
 		assert.equal(snapshot.tweets[0].media.length, 0);
+	});
+});
+
+describe("isRootCaptured", () => {
+	it("is true when the source status id is among the tweets", () => {
+		const snapshot = assembleSnapshot([RAW_ROOT], RAW_ROOT.url);
+
+		assert.equal(isRootCaptured(snapshot), true);
+	});
+
+	it("is false when the page opened at a reply and the root never loaded", () => {
+		const snapshot = assembleSnapshot(
+			[RAW_REPLY],
+			"https://x.com/asidorenko_/status/2096302171243315378",
+		);
+
+		assert.equal(isRootCaptured(snapshot), false);
+	});
+
+	it("is true for non-thread pages where no root is expected", () => {
+		const snapshot = assembleSnapshot([RAW_ROOT], RAW_ROOT.url);
+		snapshot.sourceUrl = "https://x.com/home";
+
+		assert.equal(isRootCaptured(snapshot), true);
 	});
 });
 

@@ -230,6 +230,23 @@ function mergeMediaEntry(media, found) {
 }
 
 /**
+ * True when the tweet the page was opened on is among the captured
+ * tweets. False means the user opened a reply permalink and the ancestors
+ * above the viewport never loaded — the honest signal for a "root
+ * missing" hint instead of a silently headless thread.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot
+ * @returns {boolean}
+ */
+export function isRootCaptured(snapshot) {
+	const sourceId = /\/status\/(\d+)/.exec(snapshot?.sourceUrl ?? "")?.[1] ?? "";
+	if (sourceId === "") {
+		return true;
+	}
+	return (snapshot?.tweets ?? []).some((tweet) => tweet.id === sourceId);
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */

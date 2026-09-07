@@ -15,6 +15,7 @@ import {
 	assignThreadRelations,
 	buildMediaManifest,
 	enrichSnapshotMedia,
+	isRootCaptured,
 	separateDirForArchive,
 	splitMediaForMode,
 	validateSnapshot,
@@ -186,6 +187,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
 		filename,
 		count: snapshot.tweets.length,
+		rootCaptured: isRootCaptured(snapshot),
 		stoppedWhy:
 			typeof lastProgress.stoppedWhy === "string"
 				? lastProgress.stoppedWhy

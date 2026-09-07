@@ -148,13 +148,16 @@ function renderResult(result) {
 		setStatus(`failed: ${JSON.stringify(result.payload)}`);
 		return;
 	}
-	const media = /** @type {{ downloaded?: unknown }} */ (
-		result.payload?.media ?? {}
-	);
+	const payload = result.payload ?? {};
+	const media = /** @type {{ downloaded?: unknown }} */ (payload.media ?? {});
 	const mediaText =
 		typeof media.downloaded === "number" ? `, ${media.downloaded} media` : "";
+	const rootHint =
+		payload.rootCaptured === false
+			? " Root tweet not captured — open the root tweet or scroll up, then download again."
+			: "";
 	setStatus(
-		`downloaded ${result.payload?.filename} (${result.payload?.count} tweets${mediaText}, stopped: ${result.payload?.stoppedWhy ?? "unknown"})`,
+		`downloaded ${payload.filename} (${payload.count} tweets${mediaText}, stopped: ${payload.stoppedWhy ?? "unknown"}).${rootHint}`,
 	);
 }
 
