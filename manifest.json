@@ -1,0 +1,20 @@
+{
+	"manifest_version": 3,
+	"name": "X Thread Downloader",
+	"version": "0.1.0",
+	"description": "Download thread X yang lagi dibuka beserta media lokal, export HTML/MD/JSON/CSV/XLSX.",
+	"permissions": ["activeTab", "scripting", "downloads"],
+	"action": {
+		"default_popup": "src/popup.html"
+	},
+	"background": {
+		"service_worker": "src/background.js",
+		"type": "module"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://x.com/*", "https://twitter.com/*"],
+			"js": ["src/content.js"]
+		}
+	]
+}
