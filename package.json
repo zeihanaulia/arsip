@@ -1,0 +1,20 @@
+{
+	"name": "x-downloader",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Chrome MV3 extension: download thread X + media lokal, export HTML/MD/JSON/CSV/XLSX",
+	"type": "module",
+	"scripts": {
+		"quality": "biome check . && tsc --noEmit",
+		"quality:fix": "biome check --write .",
+		"quality:ci": "biome ci . && tsc --noEmit",
+		"test": "node --test \"tests/**/*.test.js\"",
+		"verify": "npm run quality && npm test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.12",
+		"@types/chrome": "^0.1.4",
+		"@types/node": "^26.4.1",
+		"typescript": "^5.9.3"
+	}
+}

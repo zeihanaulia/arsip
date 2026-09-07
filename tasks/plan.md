@@ -1,0 +1,284 @@
+# Implementation Plan: X Thread Downloader (Chrome Extension MV3)
+
+## Overview
+
+Bangun extension Chrome MV3 DOM-only (tanpa API key / backend) yang dari tab X aktif mengambil tweet utama + semua comments/replies yang ke-load, download media secara lokal, lalu export sekali klik ke HTML rapi (preset LLM), JSON, CSV, Excel — dengan opsi autoscroll on/off. V1 fokus X saja. Repo saat ini kosong, jadi mulai dari scaffold.
+
+Sumber intent: `docs/intent/x-thread-downloader.md`. Referensi kolom Excel: file `XCommentsExporter_asidorenko__12_2026-09-07_15-47.xlsx` (43 kolom: Tweet Id, Full Text, Tweet Url, Media URLs, counts, user info, dst.).
+
+## Architecture Decisions
+
+- **MV3 + content script di tab aktif + service worker tipis + popup**: content script yang pegang DOM/scroll/download blob (hindari CORS/CSP issue di popup), service worker cuma orkestrasi + `chrome.downloads`, popup cuma UI picker. Rationale: constraint "murni dari halaman yang dibuka".
+- **Kontrak data dulu (`Tweet` schema) sebelum exporter**: semua exporter (HTML/JSON/CSV/Excel) consume satu `ThreadSnapshot` yang sama, jadi perubahan selector DOM tidak merembet ke 4 exporter.
+- **Media di-bundle sebagai ZIP (HTML + `media/` + data file)**: single-file hasil download = gampang upload ke ChatGPT dan dibuka offline. Rationale: intent "media di-download lokal".
+- **Lib minimal, zero-build dulu**: vanilla JS + `JSZip` + `SheetJS (xlsx)` via vendor lokal (tanpa bundler di Task 1-6, build step baru kalau perlu di Task 8). Rationale: repo kosong, fail fast di logic scraping dulu bukan di toolchain.
+- **Selector DOM diisolasi di satu modul adaptor (`x-adapter.js`) dengan fallback multi-selector**: DOM X berubah-ubah; satu file yang boleh brittle, sisanya stabil.
+
+## Dependency Graph
+
+```
+ThreadSnapshot schema + message protocol (Task 1)
+    │
+    ├── DOM scraper minimal, viewport-only (Task 2)
+    │       │
+    │       ├── auto-expand + autoscroll + dedup/order/reply-tree (Task 3)
+    │       │       │
+    │       │       ├── media inventory + fetch blob + zip bundle (Task 4)
+    │       │       │       │
+    │       │       │       ├── HTML LLM-ready offline (Task 5)
+    │       │       │       │
+    │       │       │       └── CSV + Excel + JSON final (Task 6)
+    │       │       │
+    │       │       └── popup UI + progress + error (Task 7, perlu kontrak Task 1 + hasil Task 2-6)
+    │       │
+    │       └── QA hardening + packaging (Task 8, perlu semuanya)
+```
+
+Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical slice yang meninggalkan sistem dalam keadaan working.
+
+## Task List
+
+### Phase 0: Foundation + first working slice
+
+## Task 1: Scaffold MV3 + kontrak data ThreadSnapshot
+
+**Description:** Scaffold extension MV3 minimal (manifest, service worker, content script stub, popup stub) plus kontrak `ThreadSnapshot` / `Tweet` schema dan message protocol popup↔content yang dipakai semua task berikutnya.
+
+**Acceptance criteria:**
+- [ ] `Load unpacked` di `chrome://extensions` sukses tanpa error/warning manifest
+- [ ] Ada `ThreadSnapshot` schema terdokumentasi (field wajib: id, text, url, createdAt, user{...}, media[], metrics{}, replyTo, conversationId) dan message protocol (`SCRAPE_START`, `SCRAPE_PROGRESS`, `SCRAPE_DONE`, `SCRAPE_ERROR`) dipakai konsisten
+- [ ] Popup stub bisa ping content script di tab x.com dan terima respons
+
+**Verification:**
+- [ ] Load unpacked manual: extension muncul, klik popup tidak error console
+- [ ] Manual check: buka thread X apapun, popup stub tampil "connected: true"
+
+**Dependencies:** None
+
+**Files likely touched:**
+- `manifest.json`
+- `src/model.js` (schema + contoh fixture 2 tweet)
+- `src/messaging.js` (protocol)
+- `src/content.js` (stub)
+- `src/popup.html`, `src/popup.js` (stub)
+
+**Estimated scope:** Medium (3-5 files)
+
+## Task 2: Scraper minimal + download JSON (viewport-only, tanpa autoscroll)
+
+**Description:** Vertical slice E2E pertama: content script parse semua `article[data-testid="tweet"]` yang SUDAH ke-load di viewport menjadi `ThreadSnapshot`, kirim ke service worker, download sebagai 1 file `.json`. Tanpa autoscroll — ini baseline yang membuktikan path scrape→download jalan.
+
+**Acceptance criteria:**
+- [ ] Di thread X nyata, klik Download → 1 file `.json` terdownload berisi array tweets (id, text, url, user, timestamp terisi, tidak kosong)
+- [ ] Tweet duplikat (DOM double-render) ter-dedup by id
+- [ ] Tidak butuh scroll: hanya klaim "visible/loaded tweets", tidak janji lengkap
+
+**Verification:**
+- [ ] Manual check di 2 thread nyata (1 thread kecil <20 replies, 1 thread media): file JSON valid (`python3 -m json.tool`), jumlah tweet > 0, buka 3 tweet url acak valid
+- [ ] Console content script tanpa error fatal
+
+**Dependencies:** Task 1
+
+**Files likely touched:**
+- `src/x-adapter.js` (selector tweet, parse user/text/url/timestamp)
+- `src/content.js` (scrape + dedup)
+- `src/background.js` (terima snapshot → `chrome.downloads.download`)
+
+**Estimated scope:** Medium (3 files)
+
+### Checkpoint: Foundation
+
+- [ ] Extension load unpacked bersih
+- [ ] Slice scrape→JSON download jalan di 2 thread nyata
+- [ ] Review dengan human sebelum lanjut (selector X rapuh — kunci pola selector sekarang atau revisi)
+
+### Phase 1: Capture lengkap + media lokal
+
+## Task 3: Auto-expand + autoscroll opsional + ordering + reply-tree
+
+**Description:** Lengkapi capture: klik semua "Show more replies / Show more" yang ada, autoscroll bertahap sampai habis ATAU sampai user stop (opsi on/off dari popup), lalu dedup + urutkan + bangun `replyTo` / `conversationId` agar thread terbaca siapa-reply-siapa.
+
+**Acceptance criteria:**
+- [ ] Dengan autoscroll ON di thread 50+ replies, jumlah tweet hasil > jumlah viewport-only (Task 2) dan tidak ada duplikat id
+- [ ] Dengan autoscroll OFF, perilaku identik Task 2 (tidak scroll sendiri)
+- [ ] Ada progress event ke popup (mis. `scraped: N tweets`) dan mekanisme stop (timeout / batas N / tombol cancel)
+- [ ] `replyTo` / `conversationId` terisi bila info ada di DOM/URL; bila tidak ada, fallback urutan DOM + penanda `inferred: true` (tidak ngarang id)
+
+**Verification:**
+- [ ] Manual check di 1 thread panjang (50+ replies): bandingkan count ON vs OFF, cek tidak hang (stop < 60 dtk atau sampai habis)
+- [ ] Manual check cancel mid-scroll tidak merusak snapshot parsial (tetap bisa download)
+
+**Dependencies:** Task 2
+
+**Files likely touched:**
+- `src/scroller.js` (baru: scroll loop + expand clicker + stop condition)
+- `src/content.js` (orkestrasi scrape ulang per batch)
+- `src/x-adapter.js` (expand-button selectors + replyTo parse)
+
+**Estimated scope:** Medium (3 files)
+
+## Task 4: Media inventory + download lokal + bundle ZIP
+
+**Description:** Dari snapshot, inventarisir media (images, GIF, video poster + varian terbaik yang bisa di-fetch sebagai blob), download via content script (agar ikut sesi/login tab), simpan sebagai `media/<tweetId>-<idx>.<ext>`, rewrite referensi ke path lokal, bundle jadi ZIP siap upload.
+
+**Acceptance criteria:**
+- [ ] Di thread berisi foto, hasil ZIP berisi `media/` dengan file gambar yang bisa dibuka (bukan 0-byte / bukan HTML error page)
+- [ ] Manifest di ZIP (`media-manifest.json`) memetakan URL asli → path lokal + tipe
+- [ ] Video/GIF: minimal poster/thumbnail ter-download; bila varian mp4 langsung bisa di-fetch, ikut sertakan, bila tidak (mis. m3u8/HLS) catat di manifest sebagai `unresolved` + URL asli tetap disimpan (tidak silent-drop)
+- [ ] Nama file aman (sanitize, tanpa collision)
+
+**Verification:**
+- [ ] Manual check di 1 thread foto + 1 thread video/GIF: unzip, buka tiap file media, cek manifest lengkap
+- [ ] Manual check offline: putus internet, file di ZIP tetap terbuka (untuk yang sudah ter-bundle)
+
+**Dependencies:** Task 3
+
+**Files likely touched:**
+- `src/media.js` (baru: inventory + fetch blob + sanitize + manifest)
+- `src/zip.js` (baru: bundling via JSZip vendor)
+- `vendor/jszip.min.js` (baru)
+
+**Estimated scope:** Medium (3-4 files)
+
+### Checkpoint: Capture
+
+- [ ] Thread panjang + media ter-capture jadi ZIP parsial (JSON + media) end-to-end
+- [ ] Upload ZIP/JSON hasil ke ChatGPT manual: konteks thread kebaca (cek shows stopper sebelum bangun 3 exporter)
+- [ ] Review dengan human sebelum lanjut
+
+### Phase 2: Exporters (semua consume ThreadSnapshot yang sama)
+
+## Task 5: Exporter HTML rapi + teks LLM-ready (offline-first)
+
+**Description:** Render `thread.html` yang rapi dibaca manusia DAN hemat token buat LLM: header thread, tweet urut (reply indent/tree), user + timestamp + metrics ringkas, teks penuh, media sebagai `<img>/<video>` ke path lokal `media/`, plus `thread.md`/`thread.txt` plain-text sebagai alternatif upload ringan.
+
+**Acceptance criteria:**
+- [ ] Buka `thread.html` dari ZIP secara offline: teks lengkap terbaca, urutan reply jelas, gambar tampil dari `media/` lokal (tanpa internet)
+- [ ] Ada `thread.md` (atau `thread.txt`) satu file/$INLINE yang kalau di-upload ke ChatGPT, model bisa jawab "siapa bilang apa" tanpa missing mayor (tes 3 pertanyaan probe)
+- [ ] Escape HTML benar (tidak jebol layout kalau tweet berisi `<`, `&`, emoji, link); link asli tetap bisa diklik
+
+**Verification:**
+- [ ] Manual check offline open `thread.html` di Chrome (cache disabled)
+- [ ] Manual check upload `thread.md` ke ChatGPT: 3 probe (ringkasan, siapa-reply-siapa, ada media apa) terjawab benar
+- [ ] Manual check 1 thread berisi karakter aneh/emoji/mention/hashtag tidak merusak render
+
+**Dependencies:** Task 4
+
+**Files likely touched:**
+- `src/export-html.js` (baru)
+- `src/export-md.js` (baru, atau gabung ke export-html)
+- `src/content.js` / `src/background.js` (tambah pilihan format)
+
+**Estimated scope:** Medium (2-3 files)
+
+## Task 6: Exporter JSON final + CSV + Excel (kolom ala XCommentsExporter)
+
+**Description:** Finalisasi exporter data: JSON terstruktur penuh, CSV flat, dan `.xlsx` yang kolomnya meniru contoh XCommentsExporter (43 kolom: Tweet Id, Full Text, Tweet Url, Media URLs, Media Types/Count, Created At, Conversation Id, Reply refs, counts, language, URLs, hashtags, mentions, user fields, Scraped At). Field yang tidak ada di DOM diisi kosong + didokumentasikan, bukan dihalu.
+
+**Acceptance criteria:**
+- [ ] Header `.xlsx` 1:1 dengan contoh (urutan + nama kolom sama), 1 baris per tweet, `Media URLs` menunjuk path lokal bila ter-download + URL asli bila tidak
+- [ ] CSV bisa dibuka di Excel/Sheets tanpa kolom geser (quoting benar untuk teks berisi koma/newline/quote)
+- [ ] JSON valid dan memuat semua field schema Task 1 + `scrapedAt` + `mediaManifest`
+- [ ] Dokumen `docs/export-columns.md` memetakan tiap kolom → sumber DOM atau `empty (no DOM source)` secara jujur
+
+**Verification:**
+- [ ] Bandingkan header xlsx hasil vs header file contoh via script (diff header = kosong)
+- [ ] Buka CSV + xlsx di spreadsheet: tidak ada baris rusak pada thread berisi koma/quote/newline/emoji
+- [ ] `python3 -m json.tool` lolos untuk JSON hasil
+
+**Dependencies:** Task 4 (butuh media manifest); paralelisable dengan Task 5 setelah Task 4 selesai
+
+**Files likely touched:**
+- `src/export-json.js` (baru/finalisasi)
+- `src/export-csv.js` (baru)
+- `src/export-xlsx.js` (baru, via SheetJS vendor)
+- `vendor/xlsx.full.min.js` (baru)
+- `docs/export-columns.md` (baru)
+
+**Estimated scope:** Medium (4-5 files)
+
+### Checkpoint: Exporters
+
+- [ ] Dari 1 thread yang sama dihasilkan 5 artefak konsisten (json/csv/xlsx/html/md) dengan tweet count yang sama
+- [ ] Upload `thread.md`/HTML ke ChatGPT lolos 3 probe; xlsx/csv/json dibuka tanpa corrupt
+- [ ] Review dengan human sebelum polish UI
+
+### Phase 3: UX + QA packaging
+
+## Task 7: Popup UI final (preset tujuan + opsi + progress + error)
+
+**Description:** Popup production-ready: pilih preset (`Buat LLM` → html+md+media zip; `Data` → json/csv/xlsx+media zip; `Custom` checklist format), toggle autoscroll, tombol Download, progress bar (N tweets, N media), state error yang jelas (bukan tab, login wall, thread privat/kosong).
+
+**Acceptance criteria:**
+- [ ] Alur 1-klik: buka thread → klik extension → Download → ZIP terdownload tanpa buka devtools
+- [ ] Progress terlihat selama scrape + download media; cancel berfungsi
+- [ ] Error state eksplisit per kasus: bukan halaman thread, 0 tweet terdeteksi, media gagal sebagian (tetap hasilkan ZIP + `errors.json`, tidak gagal total)
+
+**Verification:**
+- [ ] Manual check 3 skenario: thread kecil, thread panjang+media, halaman bukan-thread (mis. home) → pesan error benar
+- [ ] Manual check preset LLM vs Data menghasilkan isi ZIP yang berbeda sesuai preset
+- [ ] Tidak ada error console yang tidak tertangani
+
+**Dependencies:** Task 5, Task 6
+
+**Files likely touched:**
+- `src/popup.html`, `src/popup.js`, `src/popup.css` (atau 1 file)
+- `src/content.js` (terima opsi format + autoscroll + cancel)
+- `src/background.js` (progress relay + final download)
+
+**Estimated scope:** Medium (3-4 files)
+
+## Task 8: Hardening + packaging + uji ChatGPT E2E
+
+**Description:** Keras-kan yang rapuh: fallback selector adaptor, batas memori/thread raksasa, sanitasi nama file, permission minimal (`activeTab`, `scripting`, `downloads` — tanpa `host_permissions` luas bila bisa), ikon, `README` instalasi unpacked, dan uji E2E final termasuk upload ke ChatGPT.
+
+**Acceptance criteria:**
+- [ ] `permissions` minimal dan terjustifikasi di README; tidak ada `eval`/remote-code; tidak ada request ke server manapun (verifikasi via DevTools Network selama scrape: hanya ke x.com/pbs.twimg.com)
+- [ ] Lolos uji di 3 thread nyata berbeda (kecil, panjang, media/video) + 1 halaman bukan-thread
+- [ ] Ada `README.md` instalasi (load unpacked) + cara pakai + batasan dikenal (video HLS, tweet terproteksi, DOM X bisa berubah)
+- [ ] Hasil akhir: 1 ZIP per download yang siap upload ke ChatGPT dan lolos 3 probe diskusi
+
+**Verification:**
+- [ ] Checklist manual 3 thread + catat hasil (count tweet, media ok/unresolved)
+- [ ] Network check: tidak ada egress selain CDN X selama operasi
+- [ ] Muat ulang extension dari folder bersih dan ulangi alur 1-klik tanpa error
+
+**Dependencies:** Task 7
+
+**Files likely touched:**
+- `manifest.json` (final permissions, icons)
+- `icons/*` (baru)
+- `README.md` (baru)
+- `src/x-adapter.js` (fallback selector + batas)
+- `TESTLOG.md` (baru, catat hasil 3 thread)
+
+**Estimated scope:** Medium (4-5 files)
+
+### Checkpoint: Complete
+
+- [ ] Semua acceptance criteria Task 1-8 terpenuhi
+- [ ] ZIP final dari thread nyata bisa di-upload ke ChatGPT dan diajak diskusi tanpa missing mayor
+- [ ] Siap review manusia; belum publish ke Chrome Web Store (out of scope v1)
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Selector DOM X berubah sewaktu-waktu | High | Isolasi di `x-adapter.js` + fallback multi-selector; Task 2-3 kunci pola lebih dulu; catat batas di README |
+| Video/GIF X memakai HLS (m3u8) tidak bisa fetch sebagai 1 blob | Med | Minimal poster ter-bundle; varian mp4 langsung diambil bila ada; sisanya catat `unresolved` di manifest, jangan silent-drop |
+| Thread raksasa (ratusan media) bikin memori/ZIP jumbo, upload ChatGPT mentok limit | Med | Batas + cancel + mode viewport-only; preset LLM pakai md/txt ringan; dokumentasikan batas |
+| `counts` (likes/views) dan field user lengkap tidak ada di DOM | Low | Isi kosong jujur + `docs/export-columns.md`; jangan ngarang angka |
+| Permission/CSP Chrome blokir fetch media dari content script | Med | Fetch dari content script (konteks tab), bukan popup/background; fallback `chrome.downloads` per-file bila blob gagal |
+
+## Open Questions
+
+- ZIP satu file vs folder terpisah — default ZIP (gampang upload), perlu opsi "tanpa zip"? (default: ZIP; diputus di Task 7 bila user minta)
+- Kualitas video: ambil varian mp4 tertinggi yang terdeteksi, atau cukup poster? (default: mp4 bila fetchable, fallback poster)
+- Quote-tweet dihitung sebagai 1 tweet terpisah + relasi `quotedId`, atau inline? (default: terpisah + relasi)
+- Batas thread raksasa: cap default berapa tweet/media sebelum minta konfirmasi? (usulan: 300 tweet / 100 media, diputus saat Task 3)
+
+## Parallelization Opportunities
+
+- Aman paralel setelah Task 4: Task 5 (HTML/MD) dan Task 6 (CSV/Excel/JSON) bisa jalan paralel karena kontrak schema sama
+- Harus sekuensial: Task 1 → 2 → 3 → 4 (rantai DOM), lalu 7 → 8 (UI + hardening di atas semuanya)
+- Butuh koordinasi: format `ThreadSnapshot` dikunci di Task 1 sebelum exporter mana pun ditulis
