@@ -17,6 +17,8 @@
  * @property {string} url Original remote URL.
  * @property {"photo" | "video" | "gif" | "captions" | "unknown"} type
  * @property {string} [localPath] Path inside the exported ZIP, once downloaded.
+ * @property {string} [captionText] Cleaned caption lines (captions only).
+ * @property {string} [unresolved] Why the bytes are absent (fetch-failed, ...).
  */
 
 /**

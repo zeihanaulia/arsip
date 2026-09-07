@@ -179,6 +179,57 @@ export function base64ToText(base64) {
 }
 
 /**
+ * Copies download results (localPath/unresolved) and decoded caption
+ * text from raw media items onto the snapshot's tweet media, matched
+ * by URL. Keeps every exporter on the single ThreadSnapshot contract.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot Mutated in place.
+ * @param {unknown[]} rawMedia Content-script items (may carry base64).
+ * @returns {import("./model.js").ThreadSnapshot} The same snapshot.
+ */
+export function enrichSnapshotMedia(snapshot, rawMedia) {
+	const byUrl = new Map();
+	for (const entry of rawMedia ?? []) {
+		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+		if (typeof item.url === "string" && item.url !== "") {
+			byUrl.set(item.url, item);
+		}
+	}
+	for (const tweet of snapshot?.tweets ?? []) {
+		tweet.media = (tweet.media ?? []).map((media) => {
+			const found = byUrl.get(media.url);
+			return found ? mergeMediaEntry(media, found) : media;
+		});
+	}
+	return snapshot;
+}
+
+/**
+ * Merges one download result into one media entry: local path,
+ * unresolved reason, and decoded caption text for subtitle files.
+ *
+ * @param {import("./model.js").TweetMedia} media
+ * @param {Record<string, unknown>} found Raw content-script item.
+ * @returns {import("./model.js").TweetMedia}
+ */
+function mergeMediaEntry(media, found) {
+	const enriched = { ...media };
+	if (typeof found.localPath === "string") {
+		enriched.localPath = found.localPath;
+	}
+	if (typeof found.unresolved === "string") {
+		enriched.unresolved = found.unresolved;
+	}
+	if (media.type === "captions" && typeof found.base64 === "string") {
+		const text = captionsToText(base64ToText(found.base64));
+		if (text !== "") {
+			enriched.captionText = text;
+		}
+	}
+	return enriched;
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */

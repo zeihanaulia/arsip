@@ -8,6 +8,7 @@ import {
 	base64ToText,
 	buildMediaManifest,
 	captionsToText,
+	enrichSnapshotMedia,
 	filenameForSnapshot,
 	separateDirForArchive,
 	snapshotToDataUrl,
@@ -254,6 +255,54 @@ describe("captionsToText", () => {
 describe("base64ToText", () => {
 	it("decodes base64 into utf8 text", () => {
 		assert.equal(base64ToText("aGVsbG8="), "hello");
+	});
+});
+
+describe("enrichSnapshotMedia", () => {
+	it("attaches local paths and decoded captions by URL", () => {
+		const snapshot = assembleSnapshot(
+			[
+				{
+					id: "1",
+					text: "t",
+					url: "https://x.com/a/status/1",
+					media: [
+						{ url: "https://pbs.twimg.com/m/a.jpg", type: "photo" },
+						{ url: "https://video.twimg.com/c.vtt", type: "captions" },
+					],
+				},
+			],
+			"https://x.com/a/status/1",
+		);
+
+		enrichSnapshotMedia(snapshot, [
+			{
+				url: "https://pbs.twimg.com/m/a.jpg",
+				localPath: "media/1-0.jpg",
+				mime: "image/jpeg",
+			},
+			{
+				url: "https://video.twimg.com/c.vtt",
+				localPath: "media/1-1.vtt",
+				mime: "text/vtt",
+				base64: Buffer.from(
+					"WEBVTT\n\n00:01 --> 00:02\nMark\n",
+					"utf8",
+				).toString("base64"),
+			},
+		]);
+
+		assert.equal(snapshot.tweets[0].media[0].localPath, "media/1-0.jpg");
+		assert.equal(snapshot.tweets[0].media[1].localPath, "media/1-1.vtt");
+		assert.equal(snapshot.tweets[0].media[1].captionText, "Mark");
+	});
+
+	it("leaves unknown URLs untouched", () => {
+		const snapshot = assembleSnapshot([RAW_ROOT], RAW_ROOT.url);
+
+		enrichSnapshotMedia(snapshot, []);
+
+		assert.equal(snapshot.tweets[0].media.length, 0);
 	});
 });
 

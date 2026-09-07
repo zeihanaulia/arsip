@@ -6,12 +6,15 @@
  * so the popup treats a stale phase as "still working" and always has
  * its own overall timeout as the last line of defence.
  */
+
+import { renderThreadHtml, renderThreadMarkdown } from "./export-html.js";
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
 import {
 	archiveFilenameForSnapshot,
 	assembleSnapshot,
 	assignThreadRelations,
 	buildMediaManifest,
+	enrichSnapshotMedia,
 	separateDirForArchive,
 	splitMediaForMode,
 	validateSnapshot,
@@ -136,6 +139,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
+	enrichSnapshotMedia(snapshot, rawMedia);
 	const archiveFilename = archiveFilenameForSnapshot(snapshot);
 	const separateDir = separateDirForArchive(archiveFilename);
 	const { zip: zipMedia, separate: separateMedia } = splitMediaForMode(
@@ -286,6 +290,8 @@ function zipFiles(snapshot, manifest, zipMedia, separateOk) {
 					name: "media-manifest.json",
 					text: JSON.stringify(manifest, null, 2),
 				},
+				{ name: "thread.html", text: renderThreadHtml(snapshot) },
+				{ name: "thread.md", text: renderThreadMarkdown(snapshot) },
 			];
 	for (const entry of zipMedia ?? []) {
 		const item = /** @type {Record<string, unknown>} */ (entry ?? {});

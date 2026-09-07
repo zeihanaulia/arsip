@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import { renderThreadHtml } from "../src/export-html.js";
+import { createThreadSnapshot, createTweet } from "../src/model.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const headed = process.env.HEADED === "1";
@@ -438,6 +442,53 @@ describe("x-adapter (real Chromium)", () => {
 
 		assert.equal(after, 2);
 		assert.equal(stats.stoppedWhy, "idle");
+	});
+
+	it("renders the exported HTML offline from local media only", async (t) => {
+		const dir = mkdtempSync(join(tmpdir(), "xdl-offline-"));
+		writeFileSync(
+			join(dir, "media-1-0.jpg"),
+			Buffer.from(
+				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+				"base64",
+			),
+		);
+		const snapshot = createThreadSnapshot({
+			sourceUrl: "https://x.com/a/status/1",
+			tweets: [
+				createTweet({
+					id: "1",
+					text: "Paper",
+					url: "https://x.com/a/status/1",
+					user: { screenName: "a" },
+					media: [
+						{
+							url: "https://pbs.twimg.com/media/a.jpg",
+							type: "photo",
+							localPath: "media-1-0.jpg",
+						},
+					],
+				}),
+			],
+		});
+		writeFileSync(join(dir, "thread.html"), renderThreadHtml(snapshot));
+
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const context = await browser.newContext();
+		const page = await context.newPage();
+		await page.goto(pathToFileURL(join(dir, "thread.html")).href);
+		await context.setOffline(true);
+		await page.reload();
+		const width = await page.evaluate(
+			() =>
+				/** @type {HTMLImageElement | null} */ (document.querySelector("img"))
+					?.naturalWidth ?? 0,
+		);
+		const text = await page.textContent("article");
+
+		assert.ok(width > 0, "local image must render with no network");
+		assert.ok(text?.includes("Paper"));
 	});
 
 	it("parses compact counts like 1.2K without guessing the rest", async (t) => {
