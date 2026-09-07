@@ -1,5 +1,5 @@
 {
-	"name": "x-downloader",
+	"name": "arsip",
 	"version": "0.1.0",
 	"private": true,
 	"description": "Chrome MV3 extension: download thread X + media lokal, export HTML/MD/JSON/CSV/XLSX",
