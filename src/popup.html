@@ -11,6 +11,12 @@
 		<label class="check"
 			><input id="autoscroll" type="checkbox" /> Auto-expand replies</label
 		>
+		<label class="row" for="videomode">Video files</label>
+		<select id="videomode">
+			<option value="bundle">Bundle into ZIP</option>
+			<option value="separate" selected>Download separately</option>
+			<option value="posters-only">Posters only</option>
+		</select>
 		<button id="download" type="button">Download JSON</button>
 		<button id="cancel" type="button" disabled>Cancel</button>
 		<p id="status" role="status" aria-live="polite">

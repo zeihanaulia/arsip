@@ -9,6 +9,7 @@ const pingButton = document.querySelector("#ping");
 const downloadButton = document.querySelector("#download");
 const cancelButton = document.querySelector("#cancel");
 const autoscrollBox = document.querySelector("#autoscroll");
+const videoModeBox = document.querySelector("#videomode");
 
 /** @type {boolean} */
 let polling = false;
@@ -52,12 +53,13 @@ function setStatus(text) {
 async function downloadVisibleThread() {
 	const autoScroll =
 		autoscrollBox instanceof HTMLInputElement && autoscrollBox.checked;
+	const videoMode = readVideoMode();
 	setButtons({ downloading: true });
 	setStatus(autoScroll ? "expanding thread…" : "scraping visible tweets…");
 	try {
 		await withTimeout(
 			chrome.runtime.sendMessage(
-				createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll }),
+				createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll, videoMode }),
 			),
 			10_000,
 		);
@@ -87,6 +89,17 @@ async function downloadVisibleThread() {
 	}
 	setButtons({ downloading: false });
 	polling = false;
+}
+
+/**
+ * UI default is "separate": videos are heavy and LLMs cannot watch them.
+ *
+ * @returns {string}
+ */
+function readVideoMode() {
+	const value =
+		videoModeBox instanceof HTMLSelectElement ? videoModeBox.value : "";
+	return value === "bundle" || value === "posters-only" ? value : "separate";
 }
 
 /**

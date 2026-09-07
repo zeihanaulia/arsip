@@ -85,6 +85,19 @@ describe("popup UI (stubbed chrome APIs)", () => {
 
 		assert.equal(await page.textContent("h3"), "X Thread Downloader");
 		assert.equal(await page.isDisabled("#cancel"), true);
+		const modes = await page.$eval("#videomode", (select) =>
+			[.../** @type {HTMLSelectElement} */ (select).options].map(
+				(option) => option.value,
+			),
+		);
+		assert.deepEqual(modes, ["bundle", "separate", "posters-only"]);
+		assert.equal(
+			await page.$eval(
+				"#videomode",
+				(select) => /** @type {HTMLSelectElement} */ (select).value,
+			),
+			"separate",
+		);
 		await page.check("#autoscroll");
 		await page.click("#download");
 		await page.waitForFunction(

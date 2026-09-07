@@ -12,6 +12,8 @@ import {
 	assembleSnapshot,
 	assignThreadRelations,
 	buildMediaManifest,
+	separateDirForArchive,
+	splitMediaForMode,
 	validateSnapshot,
 } from "./snapshot.js";
 
@@ -28,7 +30,7 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
 		lastProgress = { phase: "scraping", tweets: 0, batches: 0 };
 		lastResult = null;
-		downloadThread(readAutoScroll(raw)).then((result) => {
+		downloadThread(readAutoScroll(raw), readVideoMode(raw)).then((result) => {
 			lastResult = result;
 		});
 		respond(createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, { phase: "started" }));
@@ -70,16 +72,34 @@ function readAutoScroll(message) {
 }
 
 /**
- * Full Task 2-3 path: scrape the loaded tweets (optionally auto-expand
- * first), attach thread relations, validate, download JSON.
- * Never rejects: the popup polls for the result instead of awaiting it.
+ * UI default is "separate" (videos are heavy and LLMs cannot watch
+ * them); unknown values fall back to "bundle" (single artifact).
+ *
+ * @param {import("./messaging.js").Message} message
+ * @returns {string}
+ */
+function readVideoMode(message) {
+	const payload = /** @type {{ videoMode?: unknown }} */ (
+		message.payload ?? {}
+	);
+	return payload.videoMode === "separate" ||
+		payload.videoMode === "posters-only"
+		? payload.videoMode
+		: "bundle";
+}
+
+/**
+ * Full Task 2-4 path: scrape (optionally auto-expand first), download
+ * media, attach thread relations, validate, bundle or split videos,
+ * download the archive. Never rejects: the popup polls for the result.
  *
  * @param {boolean} autoScroll
+ * @param {string} videoMode
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function downloadThread(autoScroll) {
+async function downloadThread(autoScroll, videoMode) {
 	try {
-		return await scrapeAndDownload(autoScroll);
+		return await scrapeAndDownload(autoScroll, videoMode);
 	} catch (error) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNEXPECTED",
@@ -90,11 +110,12 @@ async function downloadThread(autoScroll) {
 
 /**
  * @param {boolean} autoScroll
+ * @param {string} videoMode
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function scrapeAndDownload(autoScroll) {
+async function scrapeAndDownload(autoScroll, videoMode) {
 	const reply = await forwardToActiveTab(
-		createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll }),
+		createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll, videoMode }),
 	);
 	if (!isMessage(reply) || reply.type !== MESSAGE_TYPES.SCRAPE_DONE) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
@@ -115,7 +136,14 @@ async function scrapeAndDownload(autoScroll) {
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
-	const mediaItems = manifestItems(rawMedia);
+	const archiveFilename = archiveFilenameForSnapshot(snapshot);
+	const separateDir = separateDirForArchive(archiveFilename);
+	const { zip: zipMedia, separate: separateMedia } = splitMediaForMode(
+		rawMedia,
+		videoMode,
+	);
+	const separateOk = await downloadSeparateVideos(separateMedia, separateDir);
+	const mediaItems = manifestItems(rawMedia, separateOk, separateDir);
 	const manifest = buildMediaManifest(mediaItems);
 	const errors = validateSnapshot(snapshot);
 	if (errors.length > 0) {
@@ -126,7 +154,7 @@ async function scrapeAndDownload(autoScroll) {
 	}
 	const zipReply = await forwardToActiveTab(
 		createMessage(MESSAGE_TYPES.BUILD_ZIP, {
-			files: zipFiles(snapshot, manifest, rawMedia),
+			files: zipFiles(snapshot, manifest, zipMedia, separateOk),
 		}),
 	);
 	if (
@@ -138,13 +166,19 @@ async function scrapeAndDownload(autoScroll) {
 			code: "ZIP_FAILED",
 		});
 	}
-	const filename = archiveFilenameForSnapshot(snapshot);
+	const filename = archiveFilename;
 	await chrome.downloads.download({
 		url: `data:application/zip;base64,${zipReply.payload.zipBase64}`,
 		filename,
 		saveAs: false,
 	});
-	const downloaded = mediaItems.filter((item) => !item.unresolved).length;
+	const bundled = zipMedia.filter((entry) => {
+		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+		return typeof item.base64 === "string";
+	}).length;
+	const captions = mediaItems.filter(
+		(item) => item.type === "captions" && !item.unresolved,
+	).length;
 	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
 		filename,
 		count: snapshot.tweets.length,
@@ -154,17 +188,62 @@ async function scrapeAndDownload(autoScroll) {
 				: "viewport-only",
 		batches:
 			typeof lastProgress.batches === "number" ? lastProgress.batches : 0,
-		media: { downloaded, unresolved: mediaItems.length - downloaded },
+		media: {
+			downloaded: bundled,
+			separate: separateOk.size,
+			unresolved: mediaItems.filter((item) => item.unresolved).length,
+			captions,
+		},
 	});
 }
 
 /**
+ * Downloads videos as individual files next to the archive. Failures
+ * fall back to bundling: the URL stays out of the ok-set and the bytes
+ * travel in the ZIP instead.
+ *
+ * @param {unknown[]} separateMedia
+ * @param {string} separateDir
+ * @returns {Promise<Set<string>>} URLs downloaded separately.
+ */
+async function downloadSeparateVideos(separateMedia, separateDir) {
+	const ok = new Set();
+	for (const entry of separateMedia ?? []) {
+		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+		if (
+			typeof item.url !== "string" ||
+			typeof item.localPath !== "string" ||
+			item.url === "" ||
+			item.localPath === ""
+		) {
+			continue;
+		}
+		const filename = separateDir + item.localPath.split("/").pop();
+		try {
+			await chrome.downloads.download({
+				url: item.url,
+				filename,
+				saveAs: false,
+			});
+			ok.add(item.url);
+		} catch {
+			// Falls back to ZIP bundling via the ok-set check in zipFiles.
+		}
+	}
+	return ok;
+}
+
+/**
  * Picks only the manifest fields so download bytes never leak into it.
+ * Videos downloaded separately get their localPath rewritten to the
+ * sibling folder they actually landed in.
  *
  * @param {unknown} raw
+ * @param {Set<string>} separateOk URLs downloaded as individual files.
+ * @param {string} separateDir
  * @returns {{ tweetId: string, url: string, type: string, localPath?: string, mime?: string, unresolved?: string }[]}
  */
-function manifestItems(raw) {
+function manifestItems(raw, separateOk, separateDir) {
 	if (!Array.isArray(raw)) {
 		return [];
 	}
@@ -178,21 +257,28 @@ function manifestItems(raw) {
 		if (typeof item.unresolved === "string") {
 			return { ...picked, unresolved: item.unresolved };
 		}
-		return {
-			...picked,
-			localPath: typeof item.localPath === "string" ? item.localPath : "",
-			mime: typeof item.mime === "string" ? item.mime : "",
-		};
+		if (typeof item.localPath !== "string" || typeof item.mime !== "string") {
+			return { ...picked, unresolved: "missing-bytes" };
+		}
+		if (separateOk.has(picked.url)) {
+			return {
+				...picked,
+				localPath: separateDir + item.localPath.split("/").pop(),
+				mime: item.mime,
+			};
+		}
+		return { ...picked, localPath: item.localPath, mime: item.mime };
 	});
 }
 
 /**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @param {Record<string, object>} manifest
- * @param {unknown[]} rawMedia Original content-script items (may carry bytes).
+ * @param {unknown[]} zipMedia Raw items selected for bundling.
+ * @param {Set<string>} separateOk URLs already downloaded separately.
  * @returns {{ name: string, text?: string, base64?: string }[]}
  */
-function zipFiles(snapshot, manifest, rawMedia) {
+function zipFiles(snapshot, manifest, zipMedia, separateOk) {
 	const /** @type {{ name: string, text?: string, base64?: string }[]} */ files =
 			[
 				{ name: "thread.json", text: JSON.stringify(snapshot, null, 2) },
@@ -201,12 +287,12 @@ function zipFiles(snapshot, manifest, rawMedia) {
 					text: JSON.stringify(manifest, null, 2),
 				},
 			];
-	for (const entry of rawMedia ?? []) {
+	for (const entry of zipMedia ?? []) {
 		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
 		if (
-			typeof item.unresolved !== "string" &&
 			typeof item.localPath === "string" &&
-			typeof item.base64 === "string"
+			typeof item.base64 === "string" &&
+			!separateOk.has(String(item.url ?? ""))
 		) {
 			files.push({ name: item.localPath, base64: item.base64 });
 		}

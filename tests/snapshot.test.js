@@ -7,7 +7,9 @@ import {
 	assignThreadRelations,
 	buildMediaManifest,
 	filenameForSnapshot,
+	separateDirForArchive,
 	snapshotToDataUrl,
+	splitMediaForMode,
 } from "../src/snapshot.js";
 
 const RAW_ROOT = {
@@ -175,6 +177,59 @@ describe("archiveFilenameForSnapshot", () => {
 		assert.match(
 			archiveFilenameForSnapshot(snapshot),
 			/^x-thread-2096302171243315378-\d{4}-\d{2}-\d{2}\.zip$/,
+		);
+	});
+});
+
+describe("splitMediaForMode", () => {
+	const photo = {
+		tweetId: "1",
+		url: "https://pbs.twimg.com/media/a.jpg",
+		type: "photo",
+		localPath: "media/1-0.jpg",
+		base64: "AAA",
+	};
+	const video = {
+		tweetId: "2",
+		url: "https://video.twimg.com/v.mp4",
+		type: "video",
+		localPath: "media/2-0.mp4",
+		base64: "BBB",
+	};
+	const stream = {
+		tweetId: "3",
+		url: "blob:https://x.com/u",
+		type: "video",
+		unresolved: "blob-stream",
+	};
+
+	it("bundles everything by default", () => {
+		const split = splitMediaForMode([photo, video, stream], "bundle");
+
+		assert.deepEqual(split.separate, []);
+		assert.deepEqual(split.zip, [photo, video, stream]);
+	});
+
+	it("sends downloaded videos separate, keeps photos and captions bundled", () => {
+		const split = splitMediaForMode([photo, video, stream], "separate");
+
+		assert.deepEqual(split.separate, [video]);
+		assert.deepEqual(split.zip, [photo, stream]);
+	});
+
+	it("falls back to bundle on unknown modes", () => {
+		const split = splitMediaForMode([photo, video], "nope");
+
+		assert.deepEqual(split.separate, []);
+		assert.deepEqual(split.zip, [photo, video]);
+	});
+});
+
+describe("separateDirForArchive", () => {
+	it("derives a sibling folder from the archive name", () => {
+		assert.equal(
+			separateDirForArchive("x-thread-1-2026-09-07.zip"),
+			"x-thread-1-2026-09-07-media/",
 		);
 	});
 });

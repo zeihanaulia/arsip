@@ -56,15 +56,22 @@ let cancelRequested = false;
 
 /**
  * @param {unknown} raw
- * @returns {boolean}
+ * @returns {{ autoScroll: boolean, videoMode: string }}
  */
-function readAutoScroll(raw) {
+function readScrapeOptions(raw) {
 	const payload = /** @type {{ payload?: unknown }} */ (raw).payload;
-	return (
-		typeof payload === "object" &&
-		payload !== null &&
-		/** @type {{ autoScroll?: unknown }} */ (payload).autoScroll === true
+	const options = /** @type {{ autoScroll?: unknown, videoMode?: unknown }} */ (
+		payload ?? {}
 	);
+	return {
+		autoScroll: options.autoScroll === true,
+		videoMode:
+			options.videoMode === "bundle" ||
+			options.videoMode === "separate" ||
+			options.videoMode === "posters-only"
+				? options.videoMode
+				: "bundle",
+	};
 }
 
 /**
@@ -88,9 +95,10 @@ function postProgress(stats) {
 
 /**
  * @param {boolean} autoScroll
+ * @param {string} videoMode "bundle" | "separate" | "posters-only".
  * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
  */
-async function runScrape(autoScroll) {
+async function runScrape(autoScroll, videoMode) {
 	cancelRequested = false;
 	if (autoScroll) {
 		const scroller =
@@ -115,7 +123,7 @@ async function runScrape(autoScroll) {
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
-		media: await downloadThreadMedia(tweets),
+		media: await downloadThreadMedia(tweets, videoMode),
 	});
 }
 
@@ -124,9 +132,10 @@ const MAX_MEDIA_BASE64_LENGTH = 28_000_000;
 
 /**
  * @param {unknown[]} tweets Raw adapter tweets.
+ * @param {string} videoMode "posters-only" skips video bytes (posters stay).
  * @returns {Promise<Record<string, unknown>[]>} One item per inventoried URL.
  */
-async function downloadThreadMedia(tweets) {
+async function downloadThreadMedia(tweets, videoMode) {
 	const items = [];
 	for (const rawTweet of tweets ?? []) {
 		const tweet = /** @type {{ id?: unknown, media?: unknown }} */ (
@@ -137,7 +146,12 @@ async function downloadThreadMedia(tweets) {
 		for (const rawEntry of list) {
 			index += 1;
 			items.push(
-				await downloadMediaItem(String(tweet.id ?? "unknown"), index, rawEntry),
+				await downloadMediaItem(
+					String(tweet.id ?? "unknown"),
+					index,
+					rawEntry,
+					videoMode,
+				),
 			);
 		}
 	}
@@ -148,15 +162,19 @@ async function downloadThreadMedia(tweets) {
  * @param {string} tweetId
  * @param {number} index
  * @param {unknown} rawEntry
+ * @param {string} videoMode
  * @returns {Promise<Record<string, unknown>>}
  */
-async function downloadMediaItem(tweetId, index, rawEntry) {
+async function downloadMediaItem(tweetId, index, rawEntry, videoMode) {
 	const entry = /** @type {{ url?: unknown, type?: unknown }} */ (
 		rawEntry ?? {}
 	);
 	const url = typeof entry.url === "string" ? entry.url : "";
 	const type = typeof entry.type === "string" ? entry.type : "unknown";
 	const base = { tweetId, url, type };
+	if (videoMode === "posters-only" && type === "video") {
+		return { ...base, unresolved: "skipped-by-mode" };
+	}
 	const media =
 		/** @type {{ isFetchable?: (url: string) => boolean, fetchBytes?: (url: string) => Promise<{ base64: string, mime: string }>, localName?: (tweetId: string, index: number, url: string, mime: string) => string } | undefined} */ (
 			globalThis.XMedia
@@ -320,7 +338,8 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
-		runScrape(readAutoScroll(raw)).then(respond);
+		const options = readScrapeOptions(raw);
+		runScrape(options.autoScroll, options.videoMode).then(respond);
 		return true;
 	}
 	if (raw.type === MESSAGE_TYPES.BUILD_ZIP) {

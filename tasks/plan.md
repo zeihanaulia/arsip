@@ -171,7 +171,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Video itu besar dan LLM tidak bisa proses video — jadi bytes video jangan dipaksa masuk ZIP/upload. Kasih opsi di popup: video masuk ZIP vs download terpisah per-file vs cuma poster. Dan ambil caption/subtitle sebagai pengganti konten video buat konteks LLM (best-effort DOM-only: elemen `<track>` kalau ada; kalau tidak ada, catat `no-captions-in-dom` — URL subtitle X hidup di data API/JS internal, di luar jangkauan isolated world).
 
 **Acceptance criteria:**
-- [ ] Opsi popup `videoMode`: `bundle` (default sekarang) / `separate` (mp4 di-download per-file via `chrome.downloads`, ZIP isi sisanya) / `posters-only` (bytes video di-skip, poster + manifest tetap ada)
+- [ ] Opsi popup `videoMode`: `bundle` / `separate` (default — video itu berat dan LLM tidak memprosesnya) / `posters-only` (bytes video di-skip, poster + manifest tetap ada)
 - [ ] Caption: `<track src>` di-inventory + di-fetch jadi teks (mis. `media/<id>-cc.en.vtt` + teks bersih di `thread.md` Task 5); tanpa `<track>`, manifest catat alasan, bukan karangan
 - [ ] Status popup laporkan mode + ringkasan media (foto N, video bundled/separate/skipped, caption ada/tidak)
 

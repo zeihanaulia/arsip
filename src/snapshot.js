@@ -89,6 +89,48 @@ export function buildMediaManifest(items) {
 }
 
 /**
+ * Splits inventoried media by download mode. Photos and captions always
+ * stay bundled; downloaded videos go separate only in "separate" mode.
+ * Unknown modes fall back to "bundle" (single artifact, previous behavior).
+ *
+ * @param {unknown[]} rawMedia
+ * @param {string} mode
+ * @returns {{ zip: unknown[], separate: unknown[] }}
+ */
+export function splitMediaForMode(rawMedia, mode) {
+	const list = Array.isArray(rawMedia) ? rawMedia : [];
+	if (mode !== "separate") {
+		return { zip: [...list], separate: [] };
+	}
+	const zip = [];
+	const separate = [];
+	for (const entry of list) {
+		const item =
+			/** @type {{ unresolved?: unknown, type?: unknown, base64?: unknown }} */ (
+				entry ?? {}
+			);
+		if (
+			!item.unresolved &&
+			item.type === "video" &&
+			typeof item.base64 === "string"
+		) {
+			separate.push(entry);
+		} else {
+			zip.push(entry);
+		}
+	}
+	return { zip, separate };
+}
+
+/**
+ * @param {string} archiveFilename e.g. "x-thread-1-2026-09-07.zip".
+ * @returns {string} e.g. "x-thread-1-2026-09-07-media/".
+ */
+export function separateDirForArchive(archiveFilename) {
+	return `${String(archiveFilename ?? "").replace(/\.zip$/, "")}-media/`;
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */
