@@ -166,6 +166,29 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 **Estimated scope:** Medium (3-4 files)
 
+## Task 4b: Opsi video terpisah + ekstraksi caption (LLM tidak makan video)
+
+**Description:** Video itu besar dan LLM tidak bisa proses video — jadi bytes video jangan dipaksa masuk ZIP/upload. Kasih opsi di popup: video masuk ZIP vs download terpisah per-file vs cuma poster. Dan ambil caption/subtitle sebagai pengganti konten video buat konteks LLM (best-effort DOM-only: elemen `<track>` kalau ada; kalau tidak ada, catat `no-captions-in-dom` — URL subtitle X hidup di data API/JS internal, di luar jangkauan isolated world).
+
+**Acceptance criteria:**
+- [ ] Opsi popup `videoMode`: `bundle` (default sekarang) / `separate` (mp4 di-download per-file via `chrome.downloads`, ZIP isi sisanya) / `posters-only` (bytes video di-skip, poster + manifest tetap ada)
+- [ ] Caption: `<track src>` di-inventory + di-fetch jadi teks (mis. `media/<id>-cc.en.vtt` + teks bersih di `thread.md` Task 5); tanpa `<track>`, manifest catat alasan, bukan karangan
+- [ ] Status popup laporkan mode + ringkasan media (foto N, video bundled/separate/skipped, caption ada/tidak)
+
+**Verification:**
+- [ ] E2E fixture: video + `<track>` → caption ke-fetch jadi teks; tanpa track → alasan tercatat
+- [ ] Manual check di thread video nyata (mis. tweet Theo yang ada CC): mode separate hasilkan file mp4 + ZIP tanpa video + caption kalau DOM menyediakannya
+
+**Dependencies:** Task 4
+
+**Files likely touched:**
+- `src/x-adapter.js` (inventory `<track>`)
+- `src/media.js` (fetch vtt + strip jadi teks)
+- `src/content.js` / `src/background.js` (mode video, download terpisah)
+- `src/popup.html`, `src/popup.js` (opsi mode)
+
+**Estimated scope:** Medium (4-5 files)
+
 ### Checkpoint: Capture
 
 - [ ] Thread panjang + media ter-capture jadi ZIP parsial (JSON + media) end-to-end
