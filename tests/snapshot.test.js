@@ -4,6 +4,7 @@ import { validateSnapshot } from "../src/model.js";
 import {
 	assembleSnapshot,
 	assignThreadRelations,
+	buildMediaManifest,
 	filenameForSnapshot,
 	snapshotToDataUrl,
 } from "../src/snapshot.js";
@@ -125,6 +126,40 @@ describe("assignThreadRelations", () => {
 
 		assert.ok(related.every((t) => t.conversationId === RAW_ROOT.id));
 		assert.ok(related.every((t) => t.inferred));
+	});
+});
+
+describe("buildMediaManifest", () => {
+	it("maps every inventoried URL to a local path or an honest unresolved reason", () => {
+		const manifest = buildMediaManifest([
+			{
+				tweetId: "1",
+				url: "https://pbs.twimg.com/media/a.jpg",
+				type: "photo",
+				localPath: "media/1-0.jpg",
+				mime: "image/jpeg",
+			},
+			{
+				tweetId: "2",
+				url: "blob:https://x.com/uuid",
+				type: "video",
+				unresolved: "blob-stream",
+			},
+		]);
+
+		assert.deepEqual(manifest, {
+			"https://pbs.twimg.com/media/a.jpg": {
+				tweetId: "1",
+				type: "photo",
+				localPath: "media/1-0.jpg",
+				mime: "image/jpeg",
+			},
+			"blob:https://x.com/uuid": {
+				tweetId: "2",
+				type: "video",
+				unresolved: "blob-stream",
+			},
+		});
 	});
 });
 

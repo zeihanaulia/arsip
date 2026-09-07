@@ -188,6 +188,93 @@ describe("x-adapter (real Chromium)", () => {
 		]);
 	});
 
+	describe("XMedia (real Chromium)", () => {
+		it("fetches bytes for http URLs and refuses blob streams", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/media.js") });
+
+			const fetched = await page.evaluate(() =>
+				globalThis.XMedia.fetchBytes(
+					"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+				),
+			);
+			const blobVerdict = await page.evaluate(() =>
+				globalThis.XMedia.isFetchable("blob:https://x.com/9d2b6c1a-uuid"),
+			);
+			const playlistVerdict = await page.evaluate(() =>
+				globalThis.XMedia.isFetchable("https://video.twimg.com/list.m3u8"),
+			);
+
+			assert.equal(fetched.mime, "image/png");
+			assert.ok(fetched.base64.length > 0);
+			assert.equal(blobVerdict, false);
+			assert.equal(playlistVerdict, false);
+		});
+
+		it("zips files with the vendored JSZip and reads them back", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "vendor/jszip.min.js") });
+			await page.addScriptTag({ path: join(root, "src/media.js") });
+
+			const files = await page.evaluate(async () => {
+				const vendor = /** @type {{ JSZip?: unknown }} */ (globalThis);
+				const JSZipClass =
+					/** @type {new () => { file: (name: string, data: string, options?: object) => unknown, generateAsync: (options: object) => Promise<string> }} */ (
+						vendor.JSZip
+					);
+				const zipBase64 = await globalThis.XMedia.buildZip(
+					[
+						{ name: "media/1-0.jpg", base64: "aGVsbG8=" },
+						{ name: "thread.json", base64: "e30=" },
+					],
+					JSZipClass,
+				);
+				const loader =
+					/** @type {{ loadAsync: (data: string, options: object) => Promise<{ files: Record<string, unknown> }> }} */ (
+						vendor.JSZip
+					);
+				const loaded = await loader.loadAsync(zipBase64, {
+					base64: true,
+				});
+				return Object.keys(loaded.files).filter((name) => !name.endsWith("/"));
+			});
+
+			assert.deepEqual(files, ["media/1-0.jpg", "thread.json"]);
+		});
+
+		it("maps mime types to safe local filenames", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/media.js") });
+
+			const names = await page.evaluate(() => [
+				globalThis.XMedia.localName("2096", 0, "https://x/y", "image/jpeg"),
+				globalThis.XMedia.localName("2096", 1, "https://x/y", "video/mp4"),
+				globalThis.XMedia.localName("a/b?c", 2, "https://x/y", ""),
+			]);
+
+			assert.deepEqual(names, [
+				"media/2096-0.jpg",
+				"media/2096-1.mp4",
+				"media/a_b_c-2.bin",
+			]);
+		});
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

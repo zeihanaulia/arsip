@@ -57,6 +57,38 @@ export function assignThreadRelations(tweets, sourceUrl) {
 }
 
 /**
+ * Builds the media manifest: every inventoried URL maps to either a
+ * local path (downloaded) or an unresolved reason (blob stream, HLS
+ * playlist, fetch failure). Nothing is silently dropped.
+ *
+ * @param {{ tweetId: string, url: string, type: string, localPath?: string, mime?: string, unresolved?: string }[]} items
+ * @returns {Record<string, object>}
+ */
+export function buildMediaManifest(items) {
+	const /** @type {Record<string, object>} */ manifest = {};
+	for (const item of items ?? []) {
+		if (!item || typeof item.url !== "string" || item.url === "") {
+			continue;
+		}
+		if (item.unresolved) {
+			manifest[item.url] = {
+				tweetId: item.tweetId,
+				type: item.type,
+				unresolved: item.unresolved,
+			};
+		} else {
+			manifest[item.url] = {
+				tweetId: item.tweetId,
+				type: item.type,
+				localPath: item.localPath ?? "",
+				mime: item.mime ?? "",
+			};
+		}
+	}
+	return manifest;
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Filesystem-safe download name.
  */
