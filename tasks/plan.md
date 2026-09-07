@@ -45,13 +45,13 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Scaffold extension MV3 minimal (manifest, service worker, content script stub, popup stub) plus kontrak `ThreadSnapshot` / `Tweet` schema dan message protocol popup↔content yang dipakai semua task berikutnya.
 
 **Acceptance criteria:**
-- [ ] `Load unpacked` di `chrome://extensions` sukses tanpa error/warning manifest
-- [ ] Ada `ThreadSnapshot` schema terdokumentasi (field wajib: id, text, url, createdAt, user{...}, media[], metrics{}, replyTo, conversationId) dan message protocol (`SCRAPE_START`, `SCRAPE_PROGRESS`, `SCRAPE_DONE`, `SCRAPE_ERROR`) dipakai konsisten
-- [ ] Popup stub bisa ping content script di tab x.com dan terima respons
+- [x] `Load unpacked` di `chrome://extensions` sukses tanpa error/warning manifest
+- [x] Ada `ThreadSnapshot` schema terdokumentasi (field wajib: id, text, url, createdAt, user{...}, media[], metrics{}, replyTo, conversationId) dan message protocol (`SCRAPE_START`, `SCRAPE_PROGRESS`, `SCRAPE_DONE`, `SCRAPE_ERROR`) dipakai konsisten
+- [x] Popup stub bisa ping content script di tab x.com dan terima respons
 
 **Verification:**
-- [ ] Load unpacked manual: extension muncul, klik popup tidak error console
-- [ ] Manual check: buka thread X apapun, popup stub tampil "connected: true"
+- [x] Load unpacked manual: extension muncul, klik popup tidak error console
+- [x] Manual check: buka thread X apapun, popup stub tampil "connected: true"
 
 **Dependencies:** None
 
@@ -69,13 +69,13 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Vertical slice E2E pertama: content script parse semua `article[data-testid="tweet"]` yang SUDAH ke-load di viewport menjadi `ThreadSnapshot`, kirim ke service worker, download sebagai 1 file `.json`. Tanpa autoscroll — ini baseline yang membuktikan path scrape→download jalan.
 
 **Acceptance criteria:**
-- [ ] Di thread X nyata, klik Download → 1 file `.json` terdownload berisi array tweets (id, text, url, user, timestamp terisi, tidak kosong)
-- [ ] Tweet duplikat (DOM double-render) ter-dedup by id
-- [ ] Tidak butuh scroll: hanya klaim "visible/loaded tweets", tidak janji lengkap
+- [x] Di thread X nyata, klik Download → 1 file `.json` terdownload berisi array tweets (id, text, url, user, timestamp terisi, tidak kosong)
+- [x] Tweet duplikat (DOM double-render) ter-dedup by id
+- [x] Tidak butuh scroll: hanya klaim "visible/loaded tweets", tidak janji lengkap
 
 **Verification:**
 - [ ] Manual check di 2 thread nyata (1 thread kecil <20 replies, 1 thread media): file JSON valid (`python3 -m json.tool`), jumlah tweet > 0, buka 3 tweet url acak valid
-- [ ] Console content script tanpa error fatal
+- [x] Console content script tanpa error fatal
 
 **Dependencies:** Task 1
 
@@ -88,7 +88,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ### Checkpoint: Foundation
 
-- [ ] Extension load unpacked bersih
+- [x] Extension load unpacked bersih
 - [ ] Slice scrape→JSON download jalan di 2 thread nyata
 - [ ] Review dengan human sebelum lanjut (selector X rapuh — kunci pola selector sekarang atau revisi)
 
@@ -99,13 +99,13 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Lengkapi capture: klik semua "Show more replies / Show more" yang ada, autoscroll bertahap sampai habis ATAU sampai user stop (opsi on/off dari popup), lalu dedup + urutkan + bangun `replyTo` / `conversationId` agar thread terbaca siapa-reply-siapa.
 
 **Acceptance criteria:**
-- [ ] Dengan autoscroll ON di thread 50+ replies, jumlah tweet hasil > jumlah viewport-only (Task 2) dan tidak ada duplikat id
-- [ ] Dengan autoscroll OFF, perilaku identik Task 2 (tidak scroll sendiri)
-- [ ] Ada progress event ke popup (mis. `scraped: N tweets`) dan mekanisme stop (timeout / batas N / tombol cancel)
-- [ ] `replyTo` / `conversationId` terisi bila info ada di DOM/URL; bila tidak ada, fallback urutan DOM + penanda `inferred: true` (tidak ngarang id)
+- [x] Dengan autoscroll ON di thread 50+ replies, jumlah tweet hasil > jumlah viewport-only (Task 2) dan tidak ada duplikat id
+- [x] Dengan autoscroll OFF, perilaku identik Task 2 (tidak scroll sendiri)
+- [x] Ada progress event ke popup (mis. `scraped: N tweets`) dan mekanisme stop (timeout / batas N / tombol cancel)
+- [x] `replyTo` / `conversationId` terisi bila info ada di DOM/URL; bila tidak ada, fallback urutan DOM + penanda `inferred: true` (tidak ngarang id)
 
 **Verification:**
-- [ ] Manual check di 1 thread panjang (50+ replies): bandingkan count ON vs OFF, cek tidak hang (stop < 60 dtk atau sampai habis)
+- [x] Manual check di 1 thread panjang (50+ replies): bandingkan count ON vs OFF, cek tidak hang (stop < 60 dtk atau sampai habis)
 - [ ] Manual check cancel mid-scroll tidak merusak snapshot parsial (tetap bisa download)
 
 **Dependencies:** Task 2
@@ -122,15 +122,15 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Tindak lanjut observasi thread nyata (16/292): kalibrasi kesabaran scroller ke timing chunk X yang malas, tampilkan alasan berhenti di popup agar tiap percobaan bisa dibaca, dan kasih styling dasar ke popup yang sekarang mentah (slice awal Task 7, final UI tetap di Task 7).
 
 **Acceptance criteria:**
-- [ ] Scroller tahan chunk lambat: fixture yang append setelah 2.5 dtk tetap ke-capture dengan default options (idle tolerance jadi parameter `maxIdleBatches`, default 4; `batchDelayMs` default 1500ms)
-- [ ] Status popup menampilkan alasan berhenti (`idle` / `max-batches` / `max-tweets` / `cancelled`) + jumlah batch, bukan cuma count
-- [ ] Popup punya styling dasar yang rapi: tombol full-width, spacing konsisten, status `role="status"`, label untuk checkbox, kontras cukup, keyboard-navigable (native elements + focus visible)
-- [ ] Tidak ada console error saat popup dibuka; wiring (download → polling → cancel) covered test UI
+- [x] Scroller tahan chunk lambat: fixture yang append setelah 2.5 dtk tetap ke-capture dengan default options (idle tolerance jadi parameter `maxIdleBatches`, default 4; `batchDelayMs` default 1500ms)
+- [x] Status popup menampilkan alasan berhenti (`idle` / `max-batches` / `max-tweets` / `cancelled`) + jumlah batch, bukan cuma count
+- [x] Popup punya styling dasar yang rapi: tombol full-width, spacing konsisten, status `role="status"`, label untuk checkbox, kontras cukup, keyboard-navigable (native elements + focus visible)
+- [x] Tidak ada console error saat popup dibuka; wiring (download → polling → cancel) covered test UI
 
 **Verification:**
-- [ ] E2E slow-fixture hijau (RED dulu lawan default lama)
-- [ ] UI test Playwright hijau (stub `chrome.*`, tidak ada console error)
-- [ ] Screenshot popup headed dicek manual
+- [x] E2E slow-fixture hijau (RED dulu lawan default lama)
+- [x] UI test Playwright hijau (stub `chrome.*`, tidak ada console error)
+- [x] Screenshot popup headed dicek manual
 - [ ] Manual check di thread nyata yang sama: count naik vs 16 + `stoppedWhy` terbaca
 
 **Dependencies:** Task 3
