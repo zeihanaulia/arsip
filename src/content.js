@@ -14,6 +14,8 @@ const MESSAGE_TYPES = Object.freeze({
 	PING: "PING",
 	SCRAPE_START: "SCRAPE_START",
 	SCRAPE_PROGRESS: "SCRAPE_PROGRESS",
+	SCRAPE_STATUS: "SCRAPE_STATUS",
+	SCRAPE_CANCEL: "SCRAPE_CANCEL",
 	SCRAPE_DONE: "SCRAPE_DONE",
 	SCRAPE_ERROR: "SCRAPE_ERROR",
 });
@@ -45,6 +47,67 @@ function isKnownMessage(value) {
 	);
 }
 
+/**
+ * Cooperative cancel flag, set by SCRAPE_CANCEL between scroll batches.
+ * @type {boolean}
+ */
+let cancelRequested = false;
+
+/**
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+function readAutoScroll(raw) {
+	const payload = /** @type {{ payload?: unknown }} */ (raw).payload;
+	return (
+		typeof payload === "object" &&
+		payload !== null &&
+		/** @type {{ autoScroll?: unknown }} */ (payload).autoScroll === true
+	);
+}
+
+/**
+ * Fire-and-forget progress report. Failures are swallowed on purpose:
+ * the final response still travels through the tabs.sendMessage channel.
+ *
+ * @param {Record<string, unknown>} stats
+ */
+function postProgress(stats) {
+	try {
+		const pending = chrome.runtime.sendMessage(
+			reply(MESSAGE_TYPES.SCRAPE_PROGRESS, stats),
+		);
+		if (pending && typeof pending.catch === "function") {
+			pending.catch(() => {});
+		}
+	} catch {
+		// Background unreachable mid-scroll; the final answer still goes out.
+	}
+}
+
+/**
+ * @param {boolean} autoScroll
+ * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
+ */
+async function runScrape(autoScroll) {
+	cancelRequested = false;
+	if (autoScroll) {
+		const scroller =
+			/** @type {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>> } | undefined} */ (
+				globalThis.XScroller
+			);
+		if (scroller && typeof scroller.expandAndScroll === "function") {
+			const stats = await scroller.expandAndScroll(
+				document,
+				{ shouldStop: () => cancelRequested },
+				(/** @type {Record<string, unknown>} */ progress) =>
+					postProgress({ phase: "expanding", ...progress }),
+			);
+			postProgress({ phase: "scraping", ...(stats ?? {}) });
+		}
+	}
+	return scrapeSafely();
+}
 /**
  * @returns {{ tweets: unknown[], url: string }}
  */
@@ -86,14 +149,20 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		respond(reply(MESSAGE_TYPES.PING, { connected: true }));
 		return false;
 	}
-	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
-		respond(scrapeSafely());
+	if (raw.type === MESSAGE_TYPES.SCRAPE_CANCEL) {
+		cancelRequested = true;
+		respond(reply(MESSAGE_TYPES.SCRAPE_DONE, { cancelled: true }));
 		return false;
+	}
+	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
+		runScrape(readAutoScroll(raw)).then(respond);
+		return true;
 	}
 	respond(
 		reply(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNSUPPORTED",
-			detail: "Content script only handles PING and SCRAPE_START",
+			detail:
+				"Content script only handles PING, SCRAPE_START and SCRAPE_CANCEL",
 		}),
 	);
 	return false;

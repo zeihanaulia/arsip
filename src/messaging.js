@@ -3,7 +3,7 @@
  * One frozen vocabulary so both sides fail loudly instead of drifting apart.
  */
 
-/** @typedef {"PING" | "SCRAPE_START" | "SCRAPE_PROGRESS" | "SCRAPE_DONE" | "SCRAPE_ERROR"} MessageType */
+/** @typedef {"PING" | "SCRAPE_START" | "SCRAPE_PROGRESS" | "SCRAPE_STATUS" | "SCRAPE_CANCEL" | "SCRAPE_DONE" | "SCRAPE_ERROR"} MessageType */
 
 /**
  * @typedef {Object} Message
@@ -15,6 +15,8 @@ export const MESSAGE_TYPES = Object.freeze({
 	PING: "PING",
 	SCRAPE_START: "SCRAPE_START",
 	SCRAPE_PROGRESS: "SCRAPE_PROGRESS",
+	SCRAPE_STATUS: "SCRAPE_STATUS",
+	SCRAPE_CANCEL: "SCRAPE_CANCEL",
 	SCRAPE_DONE: "SCRAPE_DONE",
 	SCRAPE_ERROR: "SCRAPE_ERROR",
 });

@@ -1,14 +1,24 @@
 /**
  * Thin orchestrator: relays popup requests to the tab and triggers
  * `chrome.downloads` on completion. Never touches page DOM or media bytes.
+ *
+ * Progress lives in module memory: the worker may sleep between polls,
+ * so the popup treats a stale phase as "still working" and always has
+ * its own overall timeout as the last line of defence.
  */
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
 import {
 	assembleSnapshot,
+	assignThreadRelations,
 	filenameForSnapshot,
 	snapshotToDataUrl,
 	validateSnapshot,
 } from "./snapshot.js";
+
+/** @type {Record<string, unknown>} */
+let lastProgress = { phase: "idle", tweets: 0, batches: 0 };
+/** @type {import("./messaging.js").Message | null} */
+let lastResult = null;
 
 chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	if (!isMessage(raw)) {
@@ -16,7 +26,30 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
-		downloadVisibleThread().then(respond);
+		lastProgress = { phase: "scraping", tweets: 0, batches: 0 };
+		lastResult = null;
+		downloadThread(readAutoScroll(raw)).then((result) => {
+			lastResult = result;
+		});
+		respond(createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, { phase: "started" }));
+		return false;
+	}
+	if (raw.type === MESSAGE_TYPES.SCRAPE_PROGRESS) {
+		lastProgress = { ...raw.payload };
+		respond(createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, { received: true }));
+		return false;
+	}
+	if (raw.type === MESSAGE_TYPES.SCRAPE_STATUS) {
+		respond(
+			createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, {
+				...lastProgress,
+				result: lastResult,
+			}),
+		);
+		return false;
+	}
+	if (raw.type === MESSAGE_TYPES.SCRAPE_CANCEL) {
+		forwardToActiveTab(raw).then(respond);
 		return true;
 	}
 	forwardToActiveTab(raw).then(respond);
@@ -24,15 +57,29 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 });
 
 /**
- * Full Task 2 path: scrape the loaded tweets, validate, download JSON.
- * Never rejects: the popup awaits our response, so a throw here would
- * hang it until the message channel closes.
+ * @param {import("./messaging.js").Message} message
+ * @returns {boolean}
+ */
+function readAutoScroll(message) {
+	const payload = message.payload ?? {};
+	return (
+		typeof payload === "object" &&
+		payload !== null &&
+		/** @type {{ autoScroll?: unknown }} */ (payload).autoScroll === true
+	);
+}
+
+/**
+ * Full Task 2-3 path: scrape the loaded tweets (optionally auto-expand
+ * first), attach thread relations, validate, download JSON.
+ * Never rejects: the popup polls for the result instead of awaiting it.
  *
+ * @param {boolean} autoScroll
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function downloadVisibleThread() {
+async function downloadThread(autoScroll) {
 	try {
-		return await scrapeAndDownload();
+		return await scrapeAndDownload(autoScroll);
 	} catch (error) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNEXPECTED",
@@ -42,11 +89,12 @@ async function downloadVisibleThread() {
 }
 
 /**
+ * @param {boolean} autoScroll
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function scrapeAndDownload() {
+async function scrapeAndDownload(autoScroll) {
 	const reply = await forwardToActiveTab(
-		createMessage(MESSAGE_TYPES.SCRAPE_START),
+		createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll }),
 	);
 	if (!isMessage(reply) || reply.type !== MESSAGE_TYPES.SCRAPE_DONE) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
@@ -56,12 +104,15 @@ async function scrapeAndDownload() {
 	const payload = /** @type {{ tweets?: unknown[], sourceUrl?: string }} */ (
 		reply.payload
 	);
+	const sourceUrl =
+		typeof payload.sourceUrl === "string" ? payload.sourceUrl : "";
 	const snapshot = assembleSnapshot(
 		/** @type {import("./model.js").TweetInput[]} */ (
 			/** @type {unknown} */ (payload.tweets ?? [])
 		),
-		typeof payload.sourceUrl === "string" ? payload.sourceUrl : "",
+		sourceUrl,
 	);
+	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
 	const errors = validateSnapshot(snapshot);
 	if (errors.length > 0) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {

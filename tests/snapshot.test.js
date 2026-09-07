@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { validateSnapshot } from "../src/model.js";
 import {
 	assembleSnapshot,
+	assignThreadRelations,
 	filenameForSnapshot,
 	snapshotToDataUrl,
 } from "../src/snapshot.js";
@@ -79,6 +80,51 @@ describe("snapshotToDataUrl", () => {
 		const parsed = JSON.parse(json);
 		assert.deepEqual(validateSnapshot(parsed), []);
 		assert.equal(parsed.tweets.length, 2);
+	});
+});
+
+describe("assignThreadRelations", () => {
+	it("fills conversationId from the thread URL for every tweet", () => {
+		const snapshot = assembleSnapshot(
+			[RAW_ROOT, RAW_REPLY],
+			"https://x.com/asidorenko_/status/2096302171243315378",
+		);
+
+		const related = assignThreadRelations(
+			snapshot.tweets,
+			"https://x.com/asidorenko_/status/2096302171243315378",
+		);
+
+		assert.ok(related.every((t) => t.conversationId === "2096302171243315378"));
+		assert.equal(related[0].replyTo, null);
+		assert.equal(related[0].inferred, false);
+	});
+
+	it("marks DOM-order relations as inferred instead of guessing parents", () => {
+		const snapshot = assembleSnapshot(
+			[RAW_ROOT, RAW_REPLY],
+			"https://x.com/asidorenko_/status/2096302171243315378",
+		);
+
+		const related = assignThreadRelations(
+			snapshot.tweets,
+			"https://x.com/asidorenko_/status/2096302171243315378",
+		);
+
+		assert.equal(related[1].replyTo, null);
+		assert.equal(related[1].inferred, true);
+	});
+
+	it("falls back to the first tweet when the URL carries no status id", () => {
+		const snapshot = assembleSnapshot([RAW_ROOT, RAW_REPLY], RAW_ROOT.url);
+
+		const related = assignThreadRelations(
+			snapshot.tweets,
+			"https://x.com/home",
+		);
+
+		assert.ok(related.every((t) => t.conversationId === RAW_ROOT.id));
+		assert.ok(related.every((t) => t.inferred));
 	});
 });
 

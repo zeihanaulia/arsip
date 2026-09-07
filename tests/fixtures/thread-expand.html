@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: thread with a Show more replies button</title>
+	</head>
+	<body>
+		<main id="timeline">
+			<article data-testid="tweet">
+				<div data-testid="User-Name">
+					<span>Alex Sidorenko</span>
+					<span>@asidorenko_</span>
+				</div>
+				<div data-testid="tweetText">Paper on cognitive complexity</div>
+				<a href="/asidorenko_/status/2096302171243315378"
+					><time datetime="2026-09-05T18:26:02.000Z">Sep 5</time></a
+				>
+			</article>
+			<button id="more" type="button">Show more replies</button>
+		</main>
+		<script>
+			document.querySelector("#more").addEventListener("click", () => {
+				const timeline = document.querySelector("#timeline");
+				const extra = document.createElement("article");
+				extra.setAttribute("data-testid", "tweet");
+				extra.innerHTML =
+					'<div data-testid="tweetText">A late reply</div>' +
+					'<a href="/gabimoncha/status/2096341610078384152">' +
+					'<time datetime="2026-09-05T20:56:02.000Z">Sep 5</time></a>';
+				timeline.append(extra);
+				document.querySelector("#more").remove();
+			});
+		</script>
+	</body>
+</html>

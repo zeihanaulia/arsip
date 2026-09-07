@@ -1,9 +1,17 @@
-/** Popup: connection check plus Task 2 JSON download. */
+/** Popup: connection check plus Task 2-3 JSON download with polling. */
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
+
+const POLL_INTERVAL_MS = 600;
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 const statusEl = document.querySelector("#status");
 const pingButton = document.querySelector("#ping");
 const downloadButton = document.querySelector("#download");
+const cancelButton = document.querySelector("#cancel");
+const autoscrollBox = document.querySelector("#autoscroll");
+
+/** @type {boolean} */
+let polling = false;
 
 pingButton?.addEventListener("click", async () => {
 	setStatus("checking…");
@@ -11,8 +19,20 @@ pingButton?.addEventListener("click", async () => {
 });
 
 downloadButton?.addEventListener("click", async () => {
-	setStatus("scraping visible tweets…");
-	setStatus(await downloadVisibleThread());
+	await downloadVisibleThread();
+});
+
+cancelButton?.addEventListener("click", async () => {
+	polling = false;
+	try {
+		await chrome.runtime.sendMessage(
+			createMessage(MESSAGE_TYPES.SCRAPE_CANCEL),
+		);
+	} catch {
+		// Background already gone; the scrape stops with the tab anyway.
+	}
+	setStatus("cancelled — a partial file may still download.");
+	setButtons({ downloading: false });
 });
 
 /**
@@ -25,26 +45,108 @@ function setStatus(text) {
 }
 
 /**
- * @returns {Promise<string>}
+ * Kicks off the scrape, then polls STATUS until the background reports
+ * a finished result. Polling (not one long await) survives worker restarts
+ * and keeps the UI responsive enough for Cancel.
  */
 async function downloadVisibleThread() {
+	const autoScroll =
+		autoscrollBox instanceof HTMLInputElement && autoscrollBox.checked;
+	setButtons({ downloading: true });
+	setStatus(autoScroll ? "expanding thread…" : "scraping visible tweets…");
 	try {
-		const reply = await withTimeout(
-			chrome.runtime.sendMessage(createMessage(MESSAGE_TYPES.SCRAPE_START)),
-			30_000,
+		await withTimeout(
+			chrome.runtime.sendMessage(
+				createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll }),
+			),
+			10_000,
 		);
-		if (!isMessage(reply)) {
-			return "unexpected response from background";
-		}
-		if (reply.type === MESSAGE_TYPES.SCRAPE_DONE) {
-			return `downloaded ${reply.payload.filename} (${reply.payload.count} tweets)`;
-		}
-		return `failed: ${JSON.stringify(reply.payload)}`;
 	} catch (error) {
-		return error instanceof Error
-			? `not reachable: ${error.message}`
-			: "download failed";
+		setButtons({ downloading: false });
+		setStatus(
+			error instanceof Error
+				? `not reachable: ${error.message}`
+				: "download failed",
+		);
+		return;
 	}
+	polling = true;
+	const started = Date.now();
+	while (polling && Date.now() - started < POLL_TIMEOUT_MS) {
+		await sleep(POLL_INTERVAL_MS);
+		if (!polling) {
+			break;
+		}
+		const done = await pollOnce();
+		if (done) {
+			break;
+		}
+	}
+	if (polling) {
+		setStatus("timed out waiting — reload the tab and try again.");
+	}
+	setButtons({ downloading: false });
+	polling = false;
+}
+
+/**
+ * @returns {Promise<boolean>} True when the job reached a terminal state.
+ */
+async function pollOnce() {
+	let reply;
+	try {
+		reply = await withTimeout(
+			chrome.runtime.sendMessage(createMessage(MESSAGE_TYPES.SCRAPE_STATUS)),
+			10_000,
+		);
+	} catch {
+		return false;
+	}
+	if (!isMessage(reply)) {
+		return false;
+	}
+	const payload = /** @type {Record<string, unknown>} */ (reply.payload);
+	const result =
+		/** @type {{ type?: string, payload?: Record<string, unknown> } | null} */ (
+			payload.result ?? null
+		);
+	if (result && isMessage(result)) {
+		polling = false;
+		if (result.type === MESSAGE_TYPES.SCRAPE_DONE) {
+			setStatus(
+				`downloaded ${result.payload.filename} (${result.payload.count} tweets)`,
+			);
+		} else {
+			setStatus(`failed: ${JSON.stringify(result.payload)}`);
+		}
+		return true;
+	}
+	const tweets = typeof payload.tweets === "number" ? payload.tweets : 0;
+	const phase = typeof payload.phase === "string" ? payload.phase : "scraping";
+	setStatus(`${phase}… ${tweets} tweets so far`);
+	return false;
+}
+
+/**
+ * @param {{ downloading: boolean }} state
+ */
+function setButtons(state) {
+	if (downloadButton instanceof HTMLButtonElement) {
+		downloadButton.disabled = state.downloading;
+	}
+	if (cancelButton instanceof HTMLButtonElement) {
+		cancelButton.disabled = !state.downloading;
+	}
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
 /**

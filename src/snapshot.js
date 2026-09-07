@@ -33,6 +33,30 @@ export function assembleSnapshot(rawTweets, sourceUrl, scrapedAt) {
 }
 
 /**
+ * Fills thread relations honestly: conversationId from the thread URL
+ * (falling back to the first tweet), replyTo only when the adapter
+ * already knows it. Everything derived from DOM order is flagged
+ * inferred so exporters never mistake position for parenthood.
+ *
+ * @param {import("./model.js").Tweet[]} tweets
+ * @param {string} sourceUrl
+ * @returns {import("./model.js").Tweet[]}
+ */
+export function assignThreadRelations(tweets, sourceUrl) {
+	const fromUrl = /\/status\/(\d+)/.exec(sourceUrl ?? "")?.[1] ?? "";
+	const conversationId = fromUrl !== "" ? fromUrl : (tweets[0]?.id ?? "");
+	return (tweets ?? []).map((tweet) => {
+		const isCertainRoot = fromUrl !== "" && tweet.id === conversationId;
+		return {
+			...tweet,
+			conversationId,
+			replyTo: tweet.replyTo ?? null,
+			inferred: tweet.replyTo != null ? tweet.inferred : !isCertainRoot,
+		};
+	});
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Filesystem-safe download name.
  */

@@ -97,6 +97,58 @@ describe("x-adapter (real Chromium)", () => {
 		);
 	});
 
+	it("finds expand buttons and reads the conversation id from the URL", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-expand.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const buttons = await page.evaluate(
+			() => globalThis.XAdapter.findExpandButtons(document).length,
+		);
+		const conversationId = await page.evaluate(() =>
+			globalThis.XAdapter.conversationIdFromUrl(
+				"https://x.com/asidorenko_/status/2096302171243315378",
+			),
+		);
+
+		assert.equal(buttons, 1);
+		assert.equal(conversationId, "2096302171243315378");
+	});
+
+	it("expands hidden replies until the timeline stops growing", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-expand.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/scroller.js") });
+
+		const before = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets.length,
+		);
+		const stats = await page.evaluate(() =>
+			globalThis.XScroller.expandAndScroll(document, {
+				maxBatches: 5,
+				batchDelayMs: 10,
+			}),
+		);
+		const after = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets.length,
+		);
+
+		assert.equal(before, 1);
+		assert.equal(stats.clicked, 1);
+		assert.equal(after, 2);
+	});
+
 	it("parses compact counts like 1.2K without guessing the rest", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

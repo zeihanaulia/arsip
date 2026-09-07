@@ -15,7 +15,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Phase 1: Capture lengkap + media lokal
 
-- [ ] Task 3: Auto-expand + autoscroll opsional + ordering + reply-tree
+- [x] Task 3: Auto-expand + autoscroll opsional + ordering + reply-tree
 - [ ] Task 4: Media inventory + download lokal + bundle ZIP
 
 ## Checkpoint: Capture

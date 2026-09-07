@@ -24,7 +24,6 @@ const SELECTORS = {
 	statusLink: ['a[href*="/status/"]'],
 	labeled: ["[aria-label]"],
 };
-
 /**
  * @param {ParentNode} root
  * @param {string[]} selectors Fallbacks, first hit wins.
@@ -159,6 +158,36 @@ function parseTweet(article) {
 }
 
 /**
+ * Buttons that reveal more of the thread. Text matching is a fallback:
+ * X restyles often, but the affordance wording is comparatively stable.
+ *
+ * @param {ParentNode} [root]
+ * @returns {HTMLButtonElement[]}
+ */
+function findExpandButtons(root) {
+	const doc = root ?? document;
+	const buttons = [];
+	for (const button of doc.querySelectorAll("button")) {
+		const label = (button.textContent ?? "").trim().toLowerCase();
+		if (
+			label !== "" &&
+			(label.includes("show more") || label.includes("show this thread"))
+		) {
+			buttons.push(button);
+		}
+	}
+	return buttons;
+}
+
+/**
+ * @param {string} pageUrl
+ * @returns {string} The status id, or "" when the URL is not a thread.
+ */
+function conversationIdFromUrl(pageUrl) {
+	return /\/status\/(\d+)/.exec(pageUrl ?? "")?.[1] ?? "";
+}
+
+/**
  * Scrape every loaded tweet in DOM order, deduped by id.
  *
  * @param {ParentNode} [doc]
@@ -180,6 +209,8 @@ function scrapeRaw(doc, pageUrl = "") {
 }
 
 globalThis.XAdapter = {
+	conversationIdFromUrl,
+	findExpandButtons,
 	findTweetElements,
 	parseCount,
 	parseTweet,
