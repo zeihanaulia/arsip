@@ -163,7 +163,7 @@ function parseTweet(article) {
  */
 function collectMedia(article) {
 	const seen = new Set();
-	const media = [];
+	const /** @type {{ url: string, type: string }[]} */ media = [];
 	for (const img of article.querySelectorAll(
 		'img[src*="pbs.twimg.com/media"]',
 	)) {
