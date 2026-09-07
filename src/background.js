@@ -126,6 +126,12 @@ async function scrapeAndDownload(autoScroll) {
 	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
 		filename,
 		count: snapshot.tweets.length,
+		stoppedWhy:
+			typeof lastProgress.stoppedWhy === "string"
+				? lastProgress.stoppedWhy
+				: "viewport-only",
+		batches:
+			typeof lastProgress.batches === "number" ? lastProgress.batches : 0,
 	});
 }
 

@@ -114,7 +114,7 @@ async function pollOnce() {
 		polling = false;
 		if (result.type === MESSAGE_TYPES.SCRAPE_DONE) {
 			setStatus(
-				`downloaded ${result.payload.filename} (${result.payload.count} tweets)`,
+				`downloaded ${result.payload.filename} (${result.payload.count} tweets, stopped: ${result.payload.stoppedWhy ?? "unknown"})`,
 			);
 		} else {
 			setStatus(`failed: ${JSON.stringify(result.payload)}`);
@@ -122,8 +122,11 @@ async function pollOnce() {
 		return true;
 	}
 	const tweets = typeof payload.tweets === "number" ? payload.tweets : 0;
+	const batches = typeof payload.batches === "number" ? payload.batches : 0;
 	const phase = typeof payload.phase === "string" ? payload.phase : "scraping";
-	setStatus(`${phase}… ${tweets} tweets so far`);
+	const stopped =
+		typeof payload.stoppedWhy === "string" ? `, ${payload.stoppedWhy}` : "";
+	setStatus(`${phase}… ${tweets} tweets, batch ${batches}${stopped}`);
 	return false;
 }
 
