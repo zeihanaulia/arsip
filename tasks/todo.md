@@ -28,7 +28,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Phase 2: Exporters
 
-- [ ] Task 5: Exporter HTML rapi + teks LLM-ready (offline-first)
+- [x] Task 5: Exporter HTML rapi + teks LLM-ready (offline-first)
 - [ ] Task 6: Exporter JSON final + CSV + Excel (kolom ala XCommentsExporter)
 
 ## Checkpoint: Exporters
