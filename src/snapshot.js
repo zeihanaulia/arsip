@@ -247,6 +247,34 @@ export function isRootCaptured(snapshot) {
 }
 
 /**
+ * Builds the capture provenance block stored on the snapshot: why the
+ * run stopped and under which options. Future 23-of-184 mysteries get
+ * answered by reading the file instead of guessing.
+ *
+ * @param {Record<string, unknown>} [progress] Last scroller progress.
+ * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown }} [options]
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean }}
+ */
+export function captureStats(progress = {}, options = {}) {
+	const stoppedWhy =
+		typeof progress.stoppedWhy === "string" && progress.stoppedWhy !== ""
+			? progress.stoppedWhy
+			: "viewport-only";
+	const batches = typeof progress.batches === "number" ? progress.batches : 0;
+	const videoMode =
+		options.videoMode === "separate" || options.videoMode === "posters-only"
+			? options.videoMode
+			: "bundle";
+	return {
+		stoppedWhy,
+		batches,
+		autoScroll: options.autoScroll === true,
+		videoMode,
+		rootCaptured: options.rootCaptured !== false,
+	};
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */

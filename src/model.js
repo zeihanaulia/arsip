@@ -48,6 +48,7 @@
  * @property {string} sourceUrl Thread URL the user had open.
  * @property {string} scrapedAt ISO timestamp of the scrape.
  * @property {Tweet[]} tweets
+ * @property {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean }} [capture] Provenance: why the run stopped and under which options.
  */
 
 /**

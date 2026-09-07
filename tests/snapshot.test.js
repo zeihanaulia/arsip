@@ -8,6 +8,7 @@ import {
 	base64ToText,
 	buildMediaManifest,
 	captionsToText,
+	captureStats,
 	enrichSnapshotMedia,
 	filenameForSnapshot,
 	isRootCaptured,
@@ -328,6 +329,34 @@ describe("isRootCaptured", () => {
 		snapshot.sourceUrl = "https://x.com/home";
 
 		assert.equal(isRootCaptured(snapshot), true);
+	});
+});
+
+describe("captureStats", () => {
+	it("records why the capture stopped for later diagnosis", () => {
+		assert.deepEqual(
+			captureStats(
+				{ stoppedWhy: "idle", batches: 12 },
+				{ autoScroll: true, videoMode: "separate", rootCaptured: true },
+			),
+			{
+				stoppedWhy: "idle",
+				batches: 12,
+				autoScroll: true,
+				videoMode: "separate",
+				rootCaptured: true,
+			},
+		);
+	});
+
+	it("falls back to viewport-only defaults when nothing ran", () => {
+		assert.deepEqual(captureStats({}, {}), {
+			stoppedWhy: "viewport-only",
+			batches: 0,
+			autoScroll: false,
+			videoMode: "bundle",
+			rootCaptured: true,
+		});
 	});
 });
 

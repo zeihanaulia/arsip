@@ -19,6 +19,7 @@ import {
 	assembleSnapshot,
 	assignThreadRelations,
 	buildMediaManifest,
+	captureStats,
 	enrichSnapshotMedia,
 	isRootCaptured,
 	separateDirForArchive,
@@ -146,6 +147,12 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);
+	const rootCaptured = isRootCaptured(snapshot);
+	snapshot.capture = captureStats(lastProgress, {
+		autoScroll,
+		videoMode,
+		rootCaptured,
+	});
 	const archiveFilename = archiveFilenameForSnapshot(snapshot);
 	const separateDir = separateDirForArchive(archiveFilename);
 	const { zip: zipMedia, separate: separateMedia } = splitMediaForMode(
@@ -192,13 +199,9 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
 		filename,
 		count: snapshot.tweets.length,
-		rootCaptured: isRootCaptured(snapshot),
-		stoppedWhy:
-			typeof lastProgress.stoppedWhy === "string"
-				? lastProgress.stoppedWhy
-				: "viewport-only",
-		batches:
-			typeof lastProgress.batches === "number" ? lastProgress.batches : 0,
+		rootCaptured,
+		stoppedWhy: snapshot.capture?.stoppedWhy ?? "viewport-only",
+		batches: snapshot.capture?.batches ?? 0,
 		media: {
 			downloaded: bundled,
 			separate: separateOk.size,
