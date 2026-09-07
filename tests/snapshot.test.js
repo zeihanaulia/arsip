@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { validateSnapshot } from "../src/model.js";
 import {
+	archiveFilenameForSnapshot,
 	assembleSnapshot,
 	assignThreadRelations,
 	buildMediaManifest,
@@ -160,6 +161,21 @@ describe("buildMediaManifest", () => {
 				unresolved: "blob-stream",
 			},
 		});
+	});
+});
+
+describe("archiveFilenameForSnapshot", () => {
+	it("swaps the json extension for zip on the same base name", () => {
+		const snapshot = assembleSnapshot([RAW_ROOT], RAW_ROOT.url);
+
+		assert.equal(
+			archiveFilenameForSnapshot(snapshot),
+			filenameForSnapshot(snapshot).replace(/\.json$/, ".zip"),
+		);
+		assert.match(
+			archiveFilenameForSnapshot(snapshot),
+			/^x-thread-2096302171243315378-\d{4}-\d{2}-\d{2}\.zip$/,
+		);
 	});
 });
 

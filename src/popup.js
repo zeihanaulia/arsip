@@ -93,41 +93,68 @@ async function downloadVisibleThread() {
  * @returns {Promise<boolean>} True when the job reached a terminal state.
  */
 async function pollOnce() {
-	let reply;
-	try {
-		reply = await withTimeout(
-			chrome.runtime.sendMessage(createMessage(MESSAGE_TYPES.SCRAPE_STATUS)),
-			10_000,
-		);
-	} catch {
+	const payload = await fetchStatus();
+	if (!payload) {
 		return false;
 	}
-	if (!isMessage(reply)) {
-		return false;
-	}
-	const payload = /** @type {Record<string, unknown>} */ (reply.payload);
 	const result =
 		/** @type {{ type?: string, payload?: Record<string, unknown> } | null} */ (
 			payload.result ?? null
 		);
 	if (result && isMessage(result)) {
 		polling = false;
-		if (result.type === MESSAGE_TYPES.SCRAPE_DONE) {
-			setStatus(
-				`downloaded ${result.payload.filename} (${result.payload.count} tweets, stopped: ${result.payload.stoppedWhy ?? "unknown"})`,
-			);
-		} else {
-			setStatus(`failed: ${JSON.stringify(result.payload)}`);
-		}
+		renderResult(result);
 		return true;
 	}
+	renderProgress(payload);
+	return false;
+}
+
+/**
+ * @returns {Promise<Record<string, unknown> | null>} Null when unreachable.
+ */
+async function fetchStatus() {
+	try {
+		const reply = await withTimeout(
+			chrome.runtime.sendMessage(createMessage(MESSAGE_TYPES.SCRAPE_STATUS)),
+			10_000,
+		);
+		return isMessage(reply)
+			? /** @type {Record<string, unknown>} */ (reply.payload)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * @param {{ type?: string, payload?: Record<string, unknown> }} result
+ */
+function renderResult(result) {
+	if (result.type !== MESSAGE_TYPES.SCRAPE_DONE) {
+		setStatus(`failed: ${JSON.stringify(result.payload)}`);
+		return;
+	}
+	const media = /** @type {{ downloaded?: unknown }} */ (
+		result.payload?.media ?? {}
+	);
+	const mediaText =
+		typeof media.downloaded === "number" ? `, ${media.downloaded} media` : "";
+	setStatus(
+		`downloaded ${result.payload?.filename} (${result.payload?.count} tweets${mediaText}, stopped: ${result.payload?.stoppedWhy ?? "unknown"})`,
+	);
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ */
+function renderProgress(payload) {
 	const tweets = typeof payload.tweets === "number" ? payload.tweets : 0;
 	const batches = typeof payload.batches === "number" ? payload.batches : 0;
 	const phase = typeof payload.phase === "string" ? payload.phase : "scraping";
 	const stopped =
 		typeof payload.stoppedWhy === "string" ? `, ${payload.stoppedWhy}` : "";
 	setStatus(`${phase}… ${tweets} tweets, batch ${batches}${stopped}`);
-	return false;
 }
 
 /**

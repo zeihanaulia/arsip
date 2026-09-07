@@ -8,10 +8,10 @@
  */
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
 import {
+	archiveFilenameForSnapshot,
 	assembleSnapshot,
 	assignThreadRelations,
-	filenameForSnapshot,
-	snapshotToDataUrl,
+	buildMediaManifest,
 	validateSnapshot,
 } from "./snapshot.js";
 
@@ -101,9 +101,10 @@ async function scrapeAndDownload(autoScroll) {
 			code: "SCRAPE_FAILED",
 		});
 	}
-	const payload = /** @type {{ tweets?: unknown[], sourceUrl?: string }} */ (
-		reply.payload
-	);
+	const payload =
+		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[] }} */ (
+			reply.payload
+		);
 	const sourceUrl =
 		typeof payload.sourceUrl === "string" ? payload.sourceUrl : "";
 	const snapshot = assembleSnapshot(
@@ -113,6 +114,9 @@ async function scrapeAndDownload(autoScroll) {
 		sourceUrl,
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
+	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
+	const mediaItems = manifestItems(rawMedia);
+	const manifest = buildMediaManifest(mediaItems);
 	const errors = validateSnapshot(snapshot);
 	if (errors.length > 0) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
@@ -120,9 +124,27 @@ async function scrapeAndDownload(autoScroll) {
 			errors,
 		});
 	}
-	const filename = filenameForSnapshot(snapshot);
-	const url = snapshotToDataUrl(snapshot);
-	await chrome.downloads.download({ url, filename, saveAs: false });
+	const zipReply = await forwardToActiveTab(
+		createMessage(MESSAGE_TYPES.BUILD_ZIP, {
+			files: zipFiles(snapshot, manifest, rawMedia),
+		}),
+	);
+	if (
+		!isMessage(zipReply) ||
+		zipReply.type !== MESSAGE_TYPES.SCRAPE_DONE ||
+		typeof zipReply.payload.zipBase64 !== "string"
+	) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "ZIP_FAILED",
+		});
+	}
+	const filename = archiveFilenameForSnapshot(snapshot);
+	await chrome.downloads.download({
+		url: `data:application/zip;base64,${zipReply.payload.zipBase64}`,
+		filename,
+		saveAs: false,
+	});
+	const downloaded = mediaItems.filter((item) => !item.unresolved).length;
 	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
 		filename,
 		count: snapshot.tweets.length,
@@ -132,7 +154,64 @@ async function scrapeAndDownload(autoScroll) {
 				: "viewport-only",
 		batches:
 			typeof lastProgress.batches === "number" ? lastProgress.batches : 0,
+		media: { downloaded, unresolved: mediaItems.length - downloaded },
 	});
+}
+
+/**
+ * Picks only the manifest fields so download bytes never leak into it.
+ *
+ * @param {unknown} raw
+ * @returns {{ tweetId: string, url: string, type: string, localPath?: string, mime?: string, unresolved?: string }[]}
+ */
+function manifestItems(raw) {
+	if (!Array.isArray(raw)) {
+		return [];
+	}
+	return raw.map((entry) => {
+		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+		const picked = {
+			tweetId: typeof item.tweetId === "string" ? item.tweetId : "",
+			url: typeof item.url === "string" ? item.url : "",
+			type: typeof item.type === "string" ? item.type : "unknown",
+		};
+		if (typeof item.unresolved === "string") {
+			return { ...picked, unresolved: item.unresolved };
+		}
+		return {
+			...picked,
+			localPath: typeof item.localPath === "string" ? item.localPath : "",
+			mime: typeof item.mime === "string" ? item.mime : "",
+		};
+	});
+}
+
+/**
+ * @param {import("./model.js").ThreadSnapshot} snapshot
+ * @param {Record<string, object>} manifest
+ * @param {unknown[]} rawMedia Original content-script items (may carry bytes).
+ * @returns {{ name: string, text?: string, base64?: string }[]}
+ */
+function zipFiles(snapshot, manifest, rawMedia) {
+	const /** @type {{ name: string, text?: string, base64?: string }[]} */ files =
+			[
+				{ name: "thread.json", text: JSON.stringify(snapshot, null, 2) },
+				{
+					name: "media-manifest.json",
+					text: JSON.stringify(manifest, null, 2),
+				},
+			];
+	for (const entry of rawMedia ?? []) {
+		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+		if (
+			typeof item.unresolved !== "string" &&
+			typeof item.localPath === "string" &&
+			typeof item.base64 === "string"
+		) {
+			files.push({ name: item.localPath, base64: item.base64 });
+		}
+	}
+	return files;
 }
 
 /**

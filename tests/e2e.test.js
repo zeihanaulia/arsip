@@ -275,6 +275,80 @@ describe("x-adapter (real Chromium)", () => {
 		});
 	});
 
+	it("builds a zip on BUILD_ZIP without touching the network", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "vendor/jszip.min.js") });
+		await page.addScriptTag({ path: join(root, "src/media.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const response = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener(
+					{
+						type: "BUILD_ZIP",
+						payload: {
+							files: [{ name: "thread.json", text: '{"tweets":[]}' }],
+						},
+					},
+					{},
+					resolve,
+				);
+			});
+		});
+		const payload =
+			/** @type {{ type?: string, payload?: Record<string, unknown> }} */ (
+				response
+			);
+
+		assert.equal(payload.type, "SCRAPE_DONE");
+		const zipBase64 = /** @type {string} */ (payload.payload?.zipBase64);
+		assert.ok(zipBase64.length > 0);
+		const names = await page.evaluate((zip) => {
+			const loader =
+				/** @type {{ loadAsync: (data: string, options: object) => Promise<{ files: Record<string, unknown> }> }} */ (
+					/** @type {unknown} */ (
+						/** @type {{ JSZip?: unknown }} */ (globalThis).JSZip
+					)
+				);
+			return loader
+				.loadAsync(zip, { base64: true })
+				.then((loaded) => Object.keys(loaded.files));
+		}, zipBase64);
+		assert.deepEqual(
+			names.filter((name) => !name.endsWith("/")),
+			["thread.json"],
+		);
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

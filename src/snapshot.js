@@ -90,6 +90,14 @@ export function buildMediaManifest(items) {
 
 /**
  * @param {import("./model.js").ThreadSnapshot} snapshot
+ * @returns {string} Same base name as the JSON export, with a zip extension.
+ */
+export function archiveFilenameForSnapshot(snapshot) {
+	return filenameForSnapshot(snapshot).replace(/\.json$/, ".zip");
+}
+
+/**
+ * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Filesystem-safe download name.
  */
 export function filenameForSnapshot(snapshot) {

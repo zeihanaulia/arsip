@@ -16,6 +16,7 @@ const MESSAGE_TYPES = Object.freeze({
 	SCRAPE_PROGRESS: "SCRAPE_PROGRESS",
 	SCRAPE_STATUS: "SCRAPE_STATUS",
 	SCRAPE_CANCEL: "SCRAPE_CANCEL",
+	BUILD_ZIP: "BUILD_ZIP",
 	SCRAPE_DONE: "SCRAPE_DONE",
 	SCRAPE_ERROR: "SCRAPE_ERROR",
 });
@@ -106,7 +107,171 @@ async function runScrape(autoScroll) {
 			postProgress({ phase: "scraping", ...(stats ?? {}) });
 		}
 	}
-	return scrapeSafely();
+	const scraped = scrapeSafely();
+	if (scraped.type !== MESSAGE_TYPES.SCRAPE_DONE) {
+		return scraped;
+	}
+	const tweets = /** @type {unknown[]} */ (scraped.payload.tweets ?? []);
+	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
+		tweets,
+		sourceUrl: scraped.payload.sourceUrl ?? "",
+		media: await downloadThreadMedia(tweets),
+	});
+}
+
+/** Per-file cap so one video cannot kill the message channel (~21MB). */
+const MAX_MEDIA_BASE64_LENGTH = 28_000_000;
+
+/**
+ * @param {unknown[]} tweets Raw adapter tweets.
+ * @returns {Promise<Record<string, unknown>[]>} One item per inventoried URL.
+ */
+async function downloadThreadMedia(tweets) {
+	const items = [];
+	for (const rawTweet of tweets ?? []) {
+		const tweet = /** @type {{ id?: unknown, media?: unknown }} */ (
+			rawTweet ?? {}
+		);
+		const list = Array.isArray(tweet.media) ? tweet.media : [];
+		let index = 0;
+		for (const rawEntry of list) {
+			index += 1;
+			items.push(
+				await downloadMediaItem(String(tweet.id ?? "unknown"), index, rawEntry),
+			);
+		}
+	}
+	return items;
+}
+
+/**
+ * @param {string} tweetId
+ * @param {number} index
+ * @param {unknown} rawEntry
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function downloadMediaItem(tweetId, index, rawEntry) {
+	const entry = /** @type {{ url?: unknown, type?: unknown }} */ (
+		rawEntry ?? {}
+	);
+	const url = typeof entry.url === "string" ? entry.url : "";
+	const type = typeof entry.type === "string" ? entry.type : "unknown";
+	const base = { tweetId, url, type };
+	const media =
+		/** @type {{ isFetchable?: (url: string) => boolean, fetchBytes?: (url: string) => Promise<{ base64: string, mime: string }>, localName?: (tweetId: string, index: number, url: string, mime: string) => string } | undefined} */ (
+			globalThis.XMedia
+		);
+	if (
+		!media ||
+		typeof media.isFetchable !== "function" ||
+		!media.isFetchable(url)
+	) {
+		return { ...base, unresolved: classifyUnresolved(url) };
+	}
+	try {
+		const fetched = await media.fetchBytes?.(url);
+		if (!fetched || fetched.base64.length > MAX_MEDIA_BASE64_LENGTH) {
+			return { ...base, unresolved: "too-large" };
+		}
+		const localPath = media.localName?.(tweetId, index, url, fetched.mime);
+		return { ...base, localPath, mime: fetched.mime, base64: fetched.base64 };
+	} catch {
+		return { ...base, unresolved: "fetch-failed" };
+	}
+}
+
+/**
+ * @param {string} url
+ * @returns {string}
+ */
+function classifyUnresolved(url) {
+	if (url === "") {
+		return "empty-url";
+	}
+	if (url.startsWith("blob:")) {
+		return "blob-stream";
+	}
+	if (/\.m3u8($|[?#])/i.test(url)) {
+		return "hls-playlist";
+	}
+	return "unfetchable-scheme";
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
+ */
+async function buildZipReply(raw) {
+	try {
+		const { buildZip, bytesToBase64, JSZipClass } = requireZipLibraries();
+		const envelope = /** @type {{ payload?: { files?: unknown } }} */ (raw);
+		const entries = toZipEntries(envelope.payload?.files, (text) =>
+			bytesToBase64(new TextEncoder().encode(text)),
+		);
+		const zipBase64 = await buildZip(entries, JSZipClass);
+		return reply(MESSAGE_TYPES.SCRAPE_DONE, { zipBase64 });
+	} catch (error) {
+		return reply(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "ZIP_FAILED",
+			detail: error instanceof Error ? error.message : "unknown error",
+		});
+	}
+}
+
+/**
+ * Grabs the two classic globals ZIP building needs, or throws a
+ * reload hint the popup can actually act on.
+ *
+ * @returns {{ buildZip: (files: { name: string, base64: string }[], JSZipClass: unknown) => Promise<string>, bytesToBase64: (bytes: Uint8Array) => string, JSZipClass: unknown }}
+ */
+function requireZipLibraries() {
+	const media =
+		/** @type {{ buildZip?: (files: { name: string, base64: string }[], JSZipClass: unknown) => Promise<string>, bytesToBase64?: (bytes: Uint8Array) => string } | undefined} */ (
+			globalThis.XMedia
+		);
+	const JSZipClass = /** @type {unknown} */ (
+		/** @type {{ JSZip?: unknown }} */ (globalThis).JSZip
+	);
+	if (
+		!media ||
+		typeof media.buildZip !== "function" ||
+		typeof media.bytesToBase64 !== "function" ||
+		!JSZipClass
+	) {
+		throw new Error("zip libraries not loaded — reload the extension");
+	}
+	return {
+		buildZip: media.buildZip,
+		bytesToBase64: media.bytesToBase64,
+		JSZipClass,
+	};
+}
+
+/**
+ * Normalizes a caller-supplied file list: nameless entries are dropped,
+ * inline text is encoded, ready bytes pass through untouched.
+ *
+ * @param {unknown} files
+ * @param {(text: string) => string} encodeText
+ * @returns {{ name: string, base64: string }[]}
+ */
+function toZipEntries(files, encodeText) {
+	const entries = [];
+	for (const rawFile of Array.isArray(files) ? files : []) {
+		const file =
+			/** @type {{ name?: unknown, text?: unknown, base64?: unknown }} */ (
+				rawFile ?? {}
+			);
+		if (typeof file.name !== "string" || file.name === "") {
+			continue;
+		}
+		if (typeof file.base64 === "string") {
+			entries.push({ name: file.name, base64: file.base64 });
+		} else if (typeof file.text === "string") {
+			entries.push({ name: file.name, base64: encodeText(file.text) });
+		}
+	}
+	return entries;
 }
 /**
  * @returns {{ tweets: unknown[], url: string }}
@@ -158,11 +323,15 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		runScrape(readAutoScroll(raw)).then(respond);
 		return true;
 	}
+	if (raw.type === MESSAGE_TYPES.BUILD_ZIP) {
+		buildZipReply(raw).then(respond);
+		return true;
+	}
 	respond(
 		reply(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNSUPPORTED",
 			detail:
-				"Content script only handles PING, SCRAPE_START and SCRAPE_CANCEL",
+				"Content script handles PING, SCRAPE_START, BUILD_ZIP and SCRAPE_CANCEL",
 		}),
 	);
 	return false;
