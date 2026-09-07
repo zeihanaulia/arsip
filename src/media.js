@@ -22,18 +22,22 @@ const /** @type {Record<string, string>} */ MIME_EXTENSIONS = {
 	};
 
 /**
- * Only plain http(s) media files are fetchable. Blob URLs die with the
- * page and m3u8 playlists are manifests, not media — both stay listed
- * as unresolved instead of being fetched into garbage.
+ * Fetchable means "worth attempting". Same-tab blob: URLs are attempted
+ * because the player that minted them shares our storage partition —
+ * failures still land as unresolved, never as garbage. m3u8 playlists
+ * are manifests, not media, and stay listed as unresolved.
  *
  * @param {string} url
  * @returns {boolean}
  */
 function isFetchable(url) {
-	if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+	if (typeof url !== "string" || url === "") {
 		return false;
 	}
-	return !/\.m3u8($|[?#])/i.test(url);
+	if (/\.m3u8($|[?#])/i.test(url)) {
+		return false;
+	}
+	return /^(https?|blob):/i.test(url);
 }
 
 /**

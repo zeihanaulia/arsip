@@ -100,11 +100,11 @@ function postProgress(stats) {
  */
 async function runScrape(autoScroll, videoMode) {
 	cancelRequested = false;
+	const scroller =
+		/** @type {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>>, mountLazyMedia?: (doc: Document) => Promise<number> } | undefined} */ (
+			globalThis.XScroller
+		);
 	if (autoScroll) {
-		const scroller =
-			/** @type {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>> } | undefined} */ (
-				globalThis.XScroller
-			);
 		if (scroller && typeof scroller.expandAndScroll === "function") {
 			const stats = await scroller.expandAndScroll(
 				document,
@@ -114,6 +114,10 @@ async function runScrape(autoScroll, videoMode) {
 			);
 			postProgress({ phase: "scraping", ...(stats ?? {}) });
 		}
+	}
+	if (scroller && typeof scroller.mountLazyMedia === "function") {
+		postProgress({ phase: "mounting" });
+		await scroller.mountLazyMedia(document);
 	}
 	const scraped = scrapeSafely();
 	if (scraped.type !== MESSAGE_TYPES.SCRAPE_DONE) {

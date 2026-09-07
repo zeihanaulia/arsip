@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: real X videoPlayer markup (amplify poster, blob source)</title>
+	</head>
+	<body>
+		<main>
+			<article data-testid="tweet">
+				<div data-testid="User-Name">
+					<span>Theo - t3.gg</span>
+					<span>@theo</span>
+				</div>
+				<div data-testid="tweetText">
+					If you understand your whole codebase, the codebase isn't that
+					important.
+				</div>
+				<a href="/theo/status/2096946867611250874"
+					><time datetime="2026-09-07T13:54:00.000Z">Sep 7</time></a
+				>
+				<div data-testid="videoPlayer">
+					<div data-testid="videoComponent">
+						<div>
+							<div>
+								<video
+									preload="none"
+									tabindex="-1"
+									playsinline=""
+									aria-label="Embedded video"
+									poster="https://pbs.twimg.com/amplify_video_thumb/2096853248754016256/img/oadTg8Y6i25lhlZc.jpg"
+									style="width: 100%; height: 100%"
+								>
+									<!-- Real X markup ships no track; this empty one
+										satisfies the a11y linter and is ignored
+										by the adapter (no src). -->
+									<track kind="captions" />
+									<source
+										type="video/mp4"
+										src="blob:https://x.com/27f73faf-7e12-4921-a7e4-19f8ad396f0e"
+									/>
+								</video>
+							</div>
+						</div>
+					</div>
+				</div>
+			</article>
+		</main>
+	</body>
+</html>

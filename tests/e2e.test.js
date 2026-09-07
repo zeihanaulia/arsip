@@ -149,6 +149,62 @@ describe("x-adapter (real Chromium)", () => {
 		assert.equal(after, 2);
 	});
 
+	it("handles real X player markup: amplify poster plus blob source", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-video-real.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = await page.evaluate(() =>
+			globalThis.XAdapter.scrapeRaw(document, location.href),
+		);
+
+		assert.equal(result.tweets.length, 1);
+		assert.deepEqual(result.tweets[0].media, [
+			{
+				url: "https://pbs.twimg.com/amplify_video_thumb/2096853248754016256/img/oadTg8Y6i25lhlZc.jpg",
+				type: "photo",
+			},
+			{
+				url: "blob:https://x.com/27f73faf-7e12-4921-a7e4-19f8ad396f0e",
+				type: "video",
+			},
+		]);
+	});
+
+	it("mounts lazy players by scrolling tweets into view", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-lazy.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/scroller.js") });
+
+		const before = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets[0].media,
+		);
+		await page.evaluate(() => globalThis.XScroller.mountLazyMedia(document));
+		const after = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets[0].media,
+		);
+
+		assert.deepEqual(before, []);
+		assert.deepEqual(after, [
+			{
+				url: "https://pbs.twimg.com/amplify_video_thumb/1/img/a.jpg",
+				type: "photo",
+			},
+			{ url: "blob:https://x.com/lazy-uuid", type: "video" },
+		]);
+	});
+
 	it("inventories photo posters and video sources without fetching", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
@@ -210,13 +266,22 @@ describe("x-adapter (real Chromium)", () => {
 			const blobVerdict = await page.evaluate(() =>
 				globalThis.XMedia.isFetchable("blob:https://x.com/9d2b6c1a-uuid"),
 			);
+			const blobBytes = await page.evaluate(async () => {
+				const url = URL.createObjectURL(
+					new Blob(["hello"], { type: "text/plain" }),
+				);
+				const fetched = await globalThis.XMedia.fetchBytes(url);
+				URL.revokeObjectURL(url);
+				return fetched;
+			});
 			const playlistVerdict = await page.evaluate(() =>
 				globalThis.XMedia.isFetchable("https://video.twimg.com/list.m3u8"),
 			);
 
 			assert.equal(fetched.mime, "image/png");
 			assert.ok(fetched.base64.length > 0);
-			assert.equal(blobVerdict, false);
+			assert.equal(blobVerdict, true);
+			assert.equal(blobBytes.mime, "text/plain");
 			assert.equal(playlistVerdict, false);
 		});
 

@@ -97,6 +97,30 @@ async function expandAndScroll(root, options = {}, onProgress) {
 }
 
 /**
+ * Scrolls every loaded tweet into view so lazily-mounted players
+ * (preload="none" video, etc.) get created before the final scrape.
+ * Cheap when nothing is lazy: one pass, one settle wait.
+ *
+ * @param {ParentNode} [root]
+ * @param {{ settleMs?: number }} [options]
+ * @returns {Promise<number>} Tweet count after mounting.
+ */
+async function mountLazyMedia(root, options = {}) {
+	const { settleMs = 1500 } = options;
+	const doc = root ?? document;
+	for (const article of globalThis.XAdapter.findTweetElements(doc)) {
+		if (
+			article instanceof Element &&
+			typeof article.scrollIntoView === "function"
+		) {
+			article.scrollIntoView({ block: "center" });
+		}
+	}
+	await sleep(settleMs);
+	return countTweets(doc);
+}
+
+/**
  * @param {ParentNode} doc
  */
 function scrollOnce(doc) {
@@ -112,4 +136,4 @@ function scrollOnce(doc) {
 	}
 }
 
-globalThis.XScroller = { expandAndScroll };
+globalThis.XScroller = { expandAndScroll, mountLazyMedia };

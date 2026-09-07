@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: video mounts only when scrolled into view</title>
+	</head>
+	<body>
+		<main>
+			<div style="height: 3000px">scroll down for the tweet</div>
+			<article data-testid="tweet" id="t1">
+				<div data-testid="tweetText">Video below the fold</div>
+				<a href="/theo/status/2096946867611250874"
+					><time datetime="2026-09-07T13:54:00.000Z">Sep 7</time></a
+				>
+				<div id="player-slot"></div>
+			</article>
+		</main>
+		<script>
+			// Mimics X lazy-mounting the player once its area is visible.
+			const observer = new IntersectionObserver((entries) => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting) {
+						continue;
+					}
+					document.querySelector("#player-slot").innerHTML =
+						'<video poster="https://pbs.twimg.com/amplify_video_thumb/1/img/a.jpg">' +
+						'<source src="blob:https://x.com/lazy-uuid" type="video/mp4" /></video>';
+					observer.disconnect();
+				}
+			});
+			observer.observe(document.querySelector("#t1"));
+		</script>
+	</body>
+</html>
