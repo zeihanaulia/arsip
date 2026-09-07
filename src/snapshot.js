@@ -131,6 +131,54 @@ export function separateDirForArchive(archiveFilename) {
 }
 
 /**
+ * Reduces WebVTT to speakable lines for LLM context: drops the header,
+ * timestamps, cue settings, and voice tags. Duplicate consecutive lines
+ * (karaoke-style repeats) collapse to one.
+ *
+ * @param {string} vtt
+ * @returns {string}
+ */
+export function captionsToText(vtt) {
+	const /** @type {string[]} */ lines = [];
+	for (const rawLine of String(vtt ?? "").split(/\r?\n/)) {
+		const line = rawLine.trim();
+		if (
+			line === "" ||
+			line === "WEBVTT" ||
+			line.includes("-->") ||
+			/^(NOTE|STYLE|REGION)/.test(line)
+		) {
+			continue;
+		}
+		const clean = line
+			.replace(/<[^>]*>/g, "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (clean !== "" && clean !== lines[lines.length - 1]) {
+			lines.push(clean);
+		}
+	}
+	return lines.join("\n");
+}
+
+/**
+ * @param {string} base64
+ * @returns {string} UTF-8 text ("" when undecodable).
+ */
+export function base64ToText(base64) {
+	try {
+		const binary = atob(String(base64 ?? ""));
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i += 1) {
+			bytes[i] = binary.charCodeAt(i);
+		}
+		return new TextDecoder().decode(bytes);
+	} catch {
+		return "";
+	}
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */

@@ -57,37 +57,6 @@ async function fetchBytes(url) {
 }
 
 /**
- * Reduces WebVTT to speakable lines for LLM context: drops the header,
- * timestamps, cue settings, and voice tags. Duplicate consecutive lines
- * (karaoke-style repeats) collapse to one.
- *
- * @param {string} vtt
- * @returns {string}
- */
-function captionsToText(vtt) {
-	const /** @type {string[]} */ lines = [];
-	for (const rawLine of String(vtt ?? "").split(/\r?\n/)) {
-		const line = rawLine.trim();
-		if (
-			line === "" ||
-			line === "WEBVTT" ||
-			line.includes("-->") ||
-			/^(NOTE|STYLE|REGION)/.test(line)
-		) {
-			continue;
-		}
-		const clean = line
-			.replace(/<[^>]*>/g, "")
-			.replace(/\s+/g, " ")
-			.trim();
-		if (clean !== "" && clean !== lines[lines.length - 1]) {
-			lines.push(clean);
-		}
-	}
-	return lines.join("\n");
-}
-
-/**
  * btoa on the whole buffer at once blows the stack for large files.
  *
  * @param {Uint8Array} bytes
@@ -131,7 +100,6 @@ async function buildZip(files, JSZipClass) {
 globalThis.XMedia = {
 	buildZip,
 	bytesToBase64,
-	captionsToText,
 	fetchBytes,
 	isFetchable,
 	localName,

@@ -5,7 +5,9 @@ import {
 	archiveFilenameForSnapshot,
 	assembleSnapshot,
 	assignThreadRelations,
+	base64ToText,
 	buildMediaManifest,
+	captionsToText,
 	filenameForSnapshot,
 	separateDirForArchive,
 	snapshotToDataUrl,
@@ -231,6 +233,27 @@ describe("separateDirForArchive", () => {
 			separateDirForArchive("x-thread-1-2026-09-07.zip"),
 			"x-thread-1-2026-09-07-media/",
 		);
+	});
+});
+
+describe("captionsToText", () => {
+	it("strips header, timestamps, tags, and karaoke repeats", () => {
+		assert.equal(
+			captionsToText(
+				"WEBVTT\n\n00:18.000 --> 00:20.000\nRealistically speaking, the code bases\n\n00:20.000 --> 00:22.000\n<v Speaker>that matter the most</v>\n00:22.000 --> 00:24.000\nthat matter the most\n",
+			),
+			"Realistically speaking, the code bases\nthat matter the most",
+		);
+	});
+
+	it("returns empty string for empty input", () => {
+		assert.equal(captionsToText(""), "");
+	});
+});
+
+describe("base64ToText", () => {
+	it("decodes base64 into utf8 text", () => {
+		assert.equal(base64ToText("aGVsbG8="), "hello");
 	});
 });
 
