@@ -178,6 +178,10 @@ describe("x-adapter (real Chromium)", () => {
 				type: "photo",
 			},
 			{ url: "https://video.twimg.com/demo/video.mp4", type: "video" },
+			{
+				url: "https://video.twimg.com/demo/captions.en.vtt",
+				type: "captions",
+			},
 		]);
 		assert.deepEqual(result.tweets[2].media, [
 			{
@@ -214,6 +218,27 @@ describe("x-adapter (real Chromium)", () => {
 			assert.ok(fetched.base64.length > 0);
 			assert.equal(blobVerdict, false);
 			assert.equal(playlistVerdict, false);
+		});
+
+		it("strips caption timestamps down to speakable lines", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/media.js") });
+
+			const text = await page.evaluate(() =>
+				globalThis.XMedia.captionsToText(
+					"WEBVTT\n\n00:18.000 --> 00:20.000\nRealistically speaking, the code bases\n\n00:20.000 --> 00:22.000\n<v Speaker>that matter the most</v>\n",
+				),
+			);
+
+			assert.equal(
+				text,
+				"Realistically speaking, the code bases\nthat matter the most",
+			);
 		});
 
 		it("zips files with the vendored JSZip and reads them back", async (t) => {

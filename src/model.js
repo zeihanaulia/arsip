@@ -15,7 +15,7 @@
 /**
  * @typedef {Object} TweetMedia
  * @property {string} url Original remote URL.
- * @property {"photo" | "video" | "gif" | "unknown"} type
+ * @property {"photo" | "video" | "gif" | "captions" | "unknown"} type
  * @property {string} [localPath] Path inside the exported ZIP, once downloaded.
  */
 

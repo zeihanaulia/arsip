@@ -175,6 +175,9 @@ function collectMedia(article) {
 		for (const source of video.querySelectorAll("source")) {
 			addMedia(media, seen, source.getAttribute("src") ?? "", "video");
 		}
+		for (const track of video.querySelectorAll("track")) {
+			addMedia(media, seen, track.getAttribute("src") ?? "", "captions");
+		}
 	}
 	return media;
 }

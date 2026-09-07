@@ -18,6 +18,7 @@ const /** @type {Record<string, string>} */ MIME_EXTENSIONS = {
 		"image/gif": "gif",
 		"image/webp": "webp",
 		"video/mp4": "mp4",
+		"text/vtt": "vtt",
 	};
 
 /**
@@ -49,6 +50,37 @@ async function fetchBytes(url) {
 		.trim();
 	const buffer = await response.arrayBuffer();
 	return { base64: bytesToBase64(new Uint8Array(buffer)), mime };
+}
+
+/**
+ * Reduces WebVTT to speakable lines for LLM context: drops the header,
+ * timestamps, cue settings, and voice tags. Duplicate consecutive lines
+ * (karaoke-style repeats) collapse to one.
+ *
+ * @param {string} vtt
+ * @returns {string}
+ */
+function captionsToText(vtt) {
+	const /** @type {string[]} */ lines = [];
+	for (const rawLine of String(vtt ?? "").split(/\r?\n/)) {
+		const line = rawLine.trim();
+		if (
+			line === "" ||
+			line === "WEBVTT" ||
+			line.includes("-->") ||
+			/^(NOTE|STYLE|REGION)/.test(line)
+		) {
+			continue;
+		}
+		const clean = line
+			.replace(/<[^>]*>/g, "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (clean !== "" && clean !== lines[lines.length - 1]) {
+			lines.push(clean);
+		}
+	}
+	return lines.join("\n");
 }
 
 /**
@@ -95,6 +127,7 @@ async function buildZip(files, JSZipClass) {
 globalThis.XMedia = {
 	buildZip,
 	bytesToBase64,
+	captionsToText,
 	fetchBytes,
 	isFetchable,
 	localName,
