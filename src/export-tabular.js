@@ -166,7 +166,9 @@ function entityCells(text) {
  * @returns {string[]} The 17 user columns in order.
  */
 function userCells(user) {
-	const profile = user ?? {};
+	const profile = /** @type {import("./model.js").TweetUser} */ (
+		user ?? { id: "", name: "", screenName: "", avatarUrl: "" }
+	);
 	return [
 		profile.id ?? "",
 		profile.name ?? "",

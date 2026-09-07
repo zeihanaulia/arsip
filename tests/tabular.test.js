@@ -58,7 +58,8 @@ describe("tweetToRow", () => {
 			sampleSnapshot().tweets[0],
 			"2026-09-07T08:47:04.748Z",
 		);
-		const cell = (name) => row[THREAD_COLUMNS.indexOf(name)];
+		const cell = (/** @type {string} */ name) =>
+			row[THREAD_COLUMNS.indexOf(name)];
 
 		assert.equal(cell("Tweet Id"), "1");
 		assert.equal(cell("Tweet Url"), "https://x.com/a/status/1");
@@ -86,7 +87,8 @@ describe("tweetToRow", () => {
 			sampleSnapshot().tweets[0],
 			"2026-09-07T08:47:04.748Z",
 		);
-		const cell = (name) => row[THREAD_COLUMNS.indexOf(name)];
+		const cell = (/** @type {string} */ name) =>
+			row[THREAD_COLUMNS.indexOf(name)];
 
 		assert.equal(cell("Hashtags"), "demo");
 		assert.equal(cell("User Mentions"), "friend");
@@ -104,12 +106,14 @@ describe("snapshotToCsv", () => {
 		assert.ok(lines[1].includes('"Hello, ""world""'));
 	});
 
-	it("keeps one row per tweet", () => {
+	it("keeps one row per tweet plus the header", () => {
 		const snapshot = sampleSnapshot();
 		snapshot.tweets.push(
 			createTweet({ id: "2", text: "second", url: "https://x.com/a/status/2" }),
 		);
 
-		assert.equal(snapshotToRows(snapshot).length, 2);
+		const rows = snapshotToRows(snapshot);
+		assert.equal(rows.length, 3);
+		assert.equal(rows[2][THREAD_COLUMNS.indexOf("Tweet Id")], "2");
 	});
 });
