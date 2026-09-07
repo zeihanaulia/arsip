@@ -17,7 +17,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 - [x] Task 3: Auto-expand + autoscroll opsional + ordering + reply-tree
 - [x] Task 3b: Tuning completeness + observabilitas + styling dasar popup
-- [ ] Task 4: Media inventory + download lokal + bundle ZIP
+- [x] Task 4: Media inventory + download lokal + bundle ZIP
 
 ## Checkpoint: Capture
 
