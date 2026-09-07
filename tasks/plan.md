@@ -309,6 +309,24 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 - [ ] ZIP final dari thread nyata bisa di-upload ke ChatGPT dan diajak diskusi tanpa missing mayor
 - [ ] Siap review manusia; belum publish ke Chrome Web Store (out of scope v1)
 
+## Backlog (post-V1, belum di-commit ke task)
+
+### B1: Capture video bytes via intersepsi network
+
+**Konteks:** Bukti thread nyata (Task 4b): poster video ke-capture, tapi blob player X tidak bisa di-resolve dari content script (`fetch-failed` di semua kasus). Plafon DOM-only = poster + URL + alasan. Untuk bytes mp4 beneran, interupsi harus pindah ke layer network.
+
+**Pendekatan yang dipertimbangkan:**
+- `chrome.webRequest` observasional (non-blocking, diizinkan MV3) untuk mencatat varian mp4 `video.twimg.com` yang di-load player → download via `chrome.downloads` langsung (URL CDN publik, browser bawa cookies sendiri)
+- Alternatif: hook `fetch`/XHR di MAIN world untuk baca URL varian + subtitle; lebih kuat tapi lebih rapuh dan berisiko review store
+- Bukan `declarativeNetRequest` (tidak bisa baca body/URL untuk di-download)
+
+**Konsekuensi yang harus diterima kalau diambil:**
+- Permission baru (`webRequest` + host `video.twimg.com`/`pbs.twimg.com`) — melanggar prinsip "permission minimal" hari ini, perlu justifikasi privasi + review store lebih ketat
+- Subtitle (`.vtt`) X juga hidup di layer ini — B1 sekalian jawab caption yang hari ini `no-captions-in-dom`
+- Bukan DOM-only lagi: garis arsitektur "content script = DOM, background = orkestrasi" perlu direvisi
+
+**Kriteria selesai (draf):** thread video Theo ke-download mp4-nya (bukan cuma poster) + subtitle kalau ada; tidak ada regresi permission untuk user yang tidak butuh video (jadikan opt-in).
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |

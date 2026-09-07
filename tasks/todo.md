@@ -47,3 +47,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [ ] Semua acceptance Task 1-8 terpenuhi
 - [ ] ZIP final siap upload ke ChatGPT tanpa missing mayor
 - [ ] Siap review; belum publish ke Web Store (out of scope v1)
+
+## Backlog (post-V1)
+
+- [ ] B1: Capture video bytes via intersepsi network (detail di `tasks/plan.md`)
