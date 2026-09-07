@@ -5,7 +5,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 ## Phase 0: Foundation + first working slice
 
 - [x] Task 1: Scaffold MV3 + kontrak data ThreadSnapshot
-- [ ] Task 2: Scraper minimal + download JSON (viewport-only)
+- [x] Task 2: Scraper minimal + download JSON (viewport-only)
 
 ## Checkpoint: Foundation
 

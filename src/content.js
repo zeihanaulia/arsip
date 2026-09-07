@@ -45,6 +45,38 @@ function isKnownMessage(value) {
 	);
 }
 
+/**
+ * @returns {{ tweets: unknown[], url: string }}
+ */
+function scrapeCurrentPage() {
+	const adapter =
+		/** @type {{ scrapeRaw?: (doc: Document, url: string) => { tweets: unknown[], url: string } } | undefined } */ (
+			globalThis.XAdapter
+		);
+	if (!adapter || typeof adapter.scrapeRaw !== "function") {
+		throw new Error("XAdapter not loaded — reload the extension and the tab");
+	}
+	return adapter.scrapeRaw(document, location.href);
+}
+
+/**
+ * Never throws: the background awaits our response, so an uncaught
+ * exception here would hang the popup forever.
+ *
+ * @returns {{ type: string, payload: Record<string, unknown> }}
+ */
+function scrapeSafely() {
+	try {
+		const { tweets, url } = scrapeCurrentPage();
+		return reply(MESSAGE_TYPES.SCRAPE_DONE, { tweets, sourceUrl: url });
+	} catch (error) {
+		return reply(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "SCRAPE_FAILED",
+			detail: error instanceof Error ? error.message : "unknown error",
+		});
+	}
+}
+
 chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	if (!isKnownMessage(raw)) {
 		respond(reply(MESSAGE_TYPES.SCRAPE_ERROR, { code: "BAD_MESSAGE" }));
@@ -54,10 +86,14 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		respond(reply(MESSAGE_TYPES.PING, { connected: true }));
 		return false;
 	}
+	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
+		respond(scrapeSafely());
+		return false;
+	}
 	respond(
 		reply(MESSAGE_TYPES.SCRAPE_ERROR, {
-			code: "NOT_IMPLEMENTED",
-			detail: "Scraping lands in Task 2",
+			code: "UNSUPPORTED",
+			detail: "Content script only handles PING and SCRAPE_START",
 		}),
 	);
 	return false;

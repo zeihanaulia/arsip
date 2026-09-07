@@ -15,6 +15,7 @@
 		"@biomejs/biome": "^2.5.12",
 		"@types/chrome": "^0.1.4",
 		"@types/node": "^26.4.1",
+		"playwright": "^1.63.0",
 		"typescript": "^5.9.3"
 	}
 }

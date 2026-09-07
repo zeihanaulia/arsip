@@ -69,21 +69,21 @@ function zeroMetrics() {
  * @returns {Tweet}
  */
 export function createTweet(partial = {}) {
-	const { id = "", user = {}, metrics = {}, ...rest } = partial;
+	const { id = "" } = partial;
 	if (id.trim() === "") {
 		throw new Error("createTweet requires a non-empty id");
 	}
+	const { user = {}, metrics = {}, media = [] } = partial;
 	return {
-		text: "",
-		url: "",
-		createdAt: "",
-		replyTo: null,
-		conversationId: "",
-		inferred: false,
-		...rest,
 		id,
+		text: partial.text ?? "",
+		url: partial.url ?? "",
+		createdAt: partial.createdAt ?? "",
+		replyTo: partial.replyTo ?? null,
+		conversationId: partial.conversationId ?? "",
+		inferred: partial.inferred ?? false,
 		user: { id: "", name: "", screenName: "", avatarUrl: "", ...user },
-		media: [...(rest.media ?? [])],
+		media: [...media],
 		metrics: { ...zeroMetrics(), ...metrics },
 	};
 }
