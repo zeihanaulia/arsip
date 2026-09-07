@@ -149,6 +149,45 @@ describe("x-adapter (real Chromium)", () => {
 		assert.equal(after, 2);
 	});
 
+	it("inventories photo posters and video sources without fetching", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = await page.evaluate(() =>
+			globalThis.XAdapter.scrapeRaw(document, location.href),
+		);
+
+		assert.deepEqual(
+			result.tweets.map((tweet) => tweet.id),
+			["2096357060401115275", "2096341610078384152", "2096348582454481165"],
+		);
+		assert.deepEqual(result.tweets[0].media, [
+			{
+				url: "https://pbs.twimg.com/media/HRfBnXSaIAA-7TD.jpg",
+				type: "photo",
+			},
+		]);
+		assert.deepEqual(result.tweets[1].media, [
+			{
+				url: "https://pbs.twimg.com/media/Poster123.jpg",
+				type: "photo",
+			},
+			{ url: "https://video.twimg.com/demo/video.mp4", type: "video" },
+		]);
+		assert.deepEqual(result.tweets[2].media, [
+			{
+				url: "https://pbs.twimg.com/media/Poster456.jpg",
+				type: "photo",
+			},
+			{ url: "blob:https://x.com/9d2b6c1a-uuid", type: "video" },
+		]);
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

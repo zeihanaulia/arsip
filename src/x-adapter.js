@@ -142,19 +142,54 @@ function parseTweet(article) {
 	const time =
 		queryFirst(article, SELECTORS.time)?.getAttribute("datetime") ?? "";
 	const parsed = Date.parse(time);
-	const media = [...article.querySelectorAll('img[src*="pbs.twimg.com/media"]')]
-		.map((img) => img.getAttribute("src") ?? "")
-		.filter((src) => src !== "")
-		.map((src) => ({ url: src, type: "photo" }));
 	return {
 		id: id.id,
 		url: id.url,
 		text: (queryFirst(article, SELECTORS.text)?.textContent ?? "").trim(),
 		createdAt: Number.isNaN(parsed) ? "" : new Date(parsed).toISOString(),
 		user: parseUser(article),
-		media,
+		media: collectMedia(article),
 		metrics: parseMetrics(article),
 	};
+}
+
+/**
+ * Photos, video posters, and video sources. Inventory only — no fetching.
+ * Blob/HLS sources stay listed so the media layer can mark them unresolved
+ * instead of silently dropping them.
+ *
+ * @param {Element} article
+ * @returns {{ url: string, type: string }[]}
+ */
+function collectMedia(article) {
+	const seen = new Set();
+	const media = [];
+	for (const img of article.querySelectorAll(
+		'img[src*="pbs.twimg.com/media"]',
+	)) {
+		addMedia(media, seen, img.getAttribute("src") ?? "", "photo");
+	}
+	for (const video of article.querySelectorAll("video")) {
+		addMedia(media, seen, video.getAttribute("poster") ?? "", "photo");
+		addMedia(media, seen, video.getAttribute("src") ?? "", "video");
+		for (const source of video.querySelectorAll("source")) {
+			addMedia(media, seen, source.getAttribute("src") ?? "", "video");
+		}
+	}
+	return media;
+}
+
+/**
+ * @param {{ url: string, type: string }[]} media
+ * @param {Set<string>} seen
+ * @param {string} url
+ * @param {string} type
+ */
+function addMedia(media, seen, url, type) {
+	if (url !== "" && !seen.has(url)) {
+		seen.add(url);
+		media.push({ url, type });
+	}
 }
 
 /**

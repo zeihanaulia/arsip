@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: photo tweet, mp4 video tweet, blob video tweet</title>
+	</head>
+	<body>
+		<main>
+			<article data-testid="tweet">
+				<div data-testid="tweetText">Look at this chart</div>
+				<a href="/asidorenko_/status/2096357060401115275"
+					><time datetime="2026-09-05T21:57:26.000Z">Sep 5</time></a
+				>
+				<img
+					src="https://pbs.twimg.com/media/HRfBnXSaIAA-7TD.jpg"
+					alt="chart comparing complexity metrics"
+				/>
+			</article>
+			<article data-testid="tweet">
+				<div data-testid="tweetText">Demo video</div>
+				<a href="/gabimoncha/status/2096341610078384152"
+					><time datetime="2026-09-05T20:56:02.000Z">Sep 5</time></a
+				>
+				<video
+					poster="https://pbs.twimg.com/media/Poster123.jpg"
+					src="https://video.twimg.com/demo/video.mp4"
+				></video>
+			</article>
+			<article data-testid="tweet">
+				<div data-testid="tweetText">Streamed clip</div>
+				<a href="/fayimora/status/2096348582454481165"
+					><time datetime="2026-09-05T21:23:44.000Z">Sep 5</time></a
+				>
+				<video poster="https://pbs.twimg.com/media/Poster456.jpg">
+					<source src="blob:https://x.com/9d2b6c1a-uuid" type="video/mp4" />
+				</video>
+			</article>
+		</main>
+	</body>
+</html>
