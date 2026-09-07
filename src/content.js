@@ -225,11 +225,15 @@ function classifyUnresolved(url) {
  */
 async function buildZipReply(raw) {
 	try {
-		const { buildZip, bytesToBase64, JSZipClass } = requireZipLibraries();
+		const { buildZip, bytesToBase64, JSZipClass, XLSXClass } =
+			requireZipLibraries();
 		const envelope = /** @type {{ payload?: { files?: unknown } }} */ (raw);
-		const entries = toZipEntries(envelope.payload?.files, (text) =>
-			bytesToBase64(new TextEncoder().encode(text)),
-		);
+		const entries = [
+			...toZipEntries(envelope.payload?.files, (text) =>
+				bytesToBase64(new TextEncoder().encode(text)),
+			),
+			...sheetEntriesToBytes(envelope.payload?.files, XLSXClass),
+		];
 		const zipBase64 = await buildZip(entries, JSZipClass);
 		return reply(MESSAGE_TYPES.SCRAPE_DONE, { zipBase64 });
 	} catch (error) {
@@ -244,7 +248,7 @@ async function buildZipReply(raw) {
  * Grabs the two classic globals ZIP building needs, or throws a
  * reload hint the popup can actually act on.
  *
- * @returns {{ buildZip: (files: { name: string, base64: string }[], JSZipClass: unknown) => Promise<string>, bytesToBase64: (bytes: Uint8Array) => string, JSZipClass: unknown }}
+ * @returns {{ buildZip: (files: { name: string, base64: string }[], JSZipClass: unknown) => Promise<string>, bytesToBase64: (bytes: Uint8Array) => string, JSZipClass: unknown, XLSXClass: unknown }}
  */
 function requireZipLibraries() {
 	const media =
@@ -262,16 +266,69 @@ function requireZipLibraries() {
 	) {
 		throw new Error("zip libraries not loaded — reload the extension");
 	}
+	const XLSXClass = /** @type {unknown} */ (
+		/** @type {{ XLSX?: unknown }} */ (globalThis).XLSX
+	);
 	return {
 		buildZip: media.buildZip,
 		bytesToBase64: media.bytesToBase64,
 		JSZipClass,
+		XLSXClass,
 	};
 }
 
 /**
+ * Converts sheet entries ({name, sheet:{columns, rows}}) into xlsx bytes
+ * with the vendored SheetJS. Throws when the library is absent so a
+ * missing spreadsheet fails loudly instead of vanishing from the ZIP.
+ *
+ * @param {unknown} files
+ * @param {unknown} XLSXClass
+ * @returns {{ name: string, base64: string }[]}
+ */
+function sheetEntriesToBytes(files, XLSXClass) {
+	const sheets = [];
+	for (const rawFile of Array.isArray(files) ? files : []) {
+		const file = /** @type {{ name?: unknown, sheet?: unknown }} */ (
+			rawFile ?? {}
+		);
+		if (typeof file.name === "string" && file.name !== "" && file.sheet) {
+			sheets.push({ name: file.name, sheet: file.sheet });
+		}
+	}
+	if (sheets.length === 0) {
+		return [];
+	}
+	const lib =
+		/** @type {{ utils: { book_new: () => unknown, aoa_to_sheet: (data: unknown[][]) => unknown, book_append_sheet: (wb: unknown, ws: unknown, name: string) => unknown }, write: (wb: unknown, options: object) => string } | null } */ (
+			XLSXClass && typeof XLSXClass === "object" ? XLSXClass : null
+		);
+	if (!lib || typeof lib.write !== "function") {
+		throw new Error(
+			"sheet library (SheetJS) not loaded — reload the extension",
+		);
+	}
+	return sheets.map(({ name, sheet }) => {
+		const grid = /** @type {{ columns?: unknown, rows?: unknown }} */ (
+			sheet ?? {}
+		);
+		if (!Array.isArray(grid.columns) || !Array.isArray(grid.rows)) {
+			throw new Error(`malformed sheet entry: ${name}`);
+		}
+		const workbook = lib.utils.book_new();
+		const worksheet = lib.utils.aoa_to_sheet([grid.columns, ...grid.rows]);
+		lib.utils.book_append_sheet(workbook, worksheet, "tweets");
+		return {
+			name,
+			base64: lib.write(workbook, { type: "base64", bookType: "xlsx" }),
+		};
+	});
+}
+
+/**
  * Normalizes a caller-supplied file list: nameless entries are dropped,
- * inline text is encoded, ready bytes pass through untouched.
+ * inline text is encoded, ready bytes pass through untouched. Sheet
+ * entries are ignored here (see sheetEntriesToBytes).
  *
  * @param {unknown} files
  * @param {(text: string) => string} encodeText

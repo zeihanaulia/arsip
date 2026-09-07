@@ -18,6 +18,7 @@
 				"src/x-adapter.js",
 				"src/scroller.js",
 				"vendor/jszip.min.js",
+				"vendor/xlsx.full.min.js",
 				"src/media.js",
 				"src/content.js"
 			]

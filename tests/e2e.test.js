@@ -422,6 +422,105 @@ describe("x-adapter (real Chromium)", () => {
 		);
 	});
 
+	it("builds thread.xlsx from sheet entries with the vendored SheetJS", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "vendor/jszip.min.js") });
+		await page.addScriptTag({ path: join(root, "vendor/xlsx.full.min.js") });
+		await page.addScriptTag({ path: join(root, "src/media.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const response = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener(
+					{
+						type: "BUILD_ZIP",
+						payload: {
+							files: [
+								{
+									name: "thread.xlsx",
+									sheet: {
+										columns: ["Tweet Id", "Full Text"],
+										rows: [["1", 'a, "b"']],
+									},
+								},
+							],
+						},
+					},
+					{},
+					resolve,
+				);
+			});
+		});
+		const payload =
+			/** @type {{ type?: string, payload?: Record<string, unknown> }} */ (
+				response
+			);
+		assert.equal(payload.type, "SCRAPE_DONE");
+
+		const sheet = await page.evaluate(
+			async (zip) => {
+				const vendor = /** @type {{ JSZip?: unknown, XLSX?: unknown }} */ (
+					globalThis
+				);
+				const zipLoader =
+					/** @type {{ loadAsync: (data: string, options: object) => Promise<{ file: (name: string) => { async: (kind: string) => Promise<string> } | null }> }} */ (
+						vendor.JSZip
+					);
+				const sheetLib =
+					/** @type {{ read: (data: string, options: object) => { Sheets: Record<string, unknown>, SheetNames: string[] }, utils: { sheet_to_json: (ws: unknown, options: object) => unknown[][] } }} */ (
+						vendor.XLSX
+					);
+				const loaded = await zipLoader.loadAsync(zip, { base64: true });
+				const file = loaded.file("thread.xlsx");
+				if (!file) {
+					throw new Error("thread.xlsx missing from archive");
+				}
+				const workbook = sheetLib.read(await file.async("base64"), {
+					type: "base64",
+				});
+				return sheetLib.utils.sheet_to_json(
+					workbook.Sheets[workbook.SheetNames[0]],
+					{ header: 1 },
+				);
+			},
+			/** @type {string} */ (payload.payload?.zipBase64),
+		);
+
+		assert.deepEqual(sheet, [
+			["Tweet Id", "Full Text"],
+			["1", 'a, "b"'],
+		]);
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

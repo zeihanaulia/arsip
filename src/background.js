@@ -8,6 +8,11 @@
  */
 
 import { renderThreadHtml, renderThreadMarkdown } from "./export-html.js";
+import {
+	snapshotToCsv,
+	snapshotToRows,
+	THREAD_COLUMNS,
+} from "./export-tabular.js";
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
 import {
 	archiveFilenameForSnapshot,
@@ -282,10 +287,10 @@ function manifestItems(raw, separateOk, separateDir) {
  * @param {Record<string, object>} manifest
  * @param {unknown[]} zipMedia Raw items selected for bundling.
  * @param {Set<string>} separateOk URLs already downloaded separately.
- * @returns {{ name: string, text?: string, base64?: string }[]}
+ * @returns {{ name: string, text?: string, base64?: string, sheet?: { columns: string[], rows: string[][] } }[]}
  */
 function zipFiles(snapshot, manifest, zipMedia, separateOk) {
-	const /** @type {{ name: string, text?: string, base64?: string }[]} */ files =
+	const /** @type {{ name: string, text?: string, base64?: string, sheet?: { columns: string[], rows: string[][] } }[]} */ files =
 			[
 				{ name: "thread.json", text: JSON.stringify(snapshot, null, 2) },
 				{
@@ -294,6 +299,14 @@ function zipFiles(snapshot, manifest, zipMedia, separateOk) {
 				},
 				{ name: "thread.html", text: renderThreadHtml(snapshot) },
 				{ name: "thread.md", text: renderThreadMarkdown(snapshot) },
+				{ name: "thread.csv", text: snapshotToCsv(snapshot) },
+				{
+					name: "thread.xlsx",
+					sheet: {
+						columns: [...THREAD_COLUMNS],
+						rows: snapshotToRows(snapshot).slice(1),
+					},
+				},
 			];
 	for (const entry of zipMedia ?? []) {
 		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
