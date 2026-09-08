@@ -100,20 +100,10 @@ function postProgress(stats) {
  */
 async function runScrape(autoScroll, videoMode) {
 	cancelRequested = false;
-	const scroller =
-		/** @type {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>>, mountLazyMedia?: (doc: Document) => Promise<number> } | undefined} */ (
-			globalThis.XScroller
-		);
+	const scroller = readScroller();
+	let scrollerMissing = false;
 	if (autoScroll) {
-		if (scroller && typeof scroller.expandAndScroll === "function") {
-			const stats = await scroller.expandAndScroll(
-				document,
-				{ shouldStop: () => cancelRequested },
-				(/** @type {Record<string, unknown>} */ progress) =>
-					postProgress({ phase: "expanding", ...progress }),
-			);
-			postProgress({ phase: "scraping", ...(stats ?? {}) });
-		}
+		scrollerMissing = await expandThread(scroller);
 	}
 	if (scroller && typeof scroller.mountLazyMedia === "function") {
 		postProgress({ phase: "mounting" });
@@ -127,10 +117,49 @@ async function runScrape(autoScroll, videoMode) {
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
+		scrollerMissing,
 		media: await downloadThreadMedia(tweets, videoMode),
 	});
 }
 
+/**
+ * @returns {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>>, mountLazyMedia?: (doc: Document) => Promise<number> } | undefined}
+ */
+function readScroller() {
+	return /** @type {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>>, mountLazyMedia?: (doc: Document) => Promise<number> } | undefined} */ (
+		globalThis.XScroller
+	);
+}
+
+/**
+ * Runs the expand phase: click "show more", scroll in batches, report
+ * progress. Never throws — expansion is best-effort on top of the
+ * viewport scrape that always follows.
+ *
+ * @param {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>> } | undefined} scroller
+ * @returns {Promise<boolean>} True when the scroller was missing entirely.
+ */
+async function expandThread(scroller) {
+	if (!scroller || typeof scroller.expandAndScroll !== "function") {
+		postProgress({ phase: "scraping", scrollerMissing: true });
+		return true;
+	}
+	try {
+		const stats = await scroller.expandAndScroll(
+			document,
+			{ shouldStop: () => cancelRequested },
+			(/** @type {Record<string, unknown>} */ progress) =>
+				postProgress({ phase: "expanding", ...progress }),
+		);
+		postProgress({ phase: "scraping", ...(stats ?? {}) });
+	} catch (error) {
+		postProgress({
+			phase: "scraping",
+			expandError: error instanceof Error ? error.message : "unknown error",
+		});
+	}
+	return false;
+}
 /** Per-file cap so one video cannot kill the message channel (~21MB). */
 const MAX_MEDIA_BASE64_LENGTH = 28_000_000;
 

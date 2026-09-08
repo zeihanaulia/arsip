@@ -133,7 +133,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		});
 	}
 	const payload =
-		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[] }} */ (
+		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[], scrollerMissing?: unknown }} */ (
 			reply.payload
 		);
 	const sourceUrl =
@@ -200,6 +200,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		filename,
 		count: snapshot.tweets.length,
 		rootCaptured,
+		scrollerMissing: payload.scrollerMissing === true,
 		stoppedWhy: snapshot.capture?.stoppedWhy ?? "viewport-only",
 		batches: snapshot.capture?.batches ?? 0,
 		media: {

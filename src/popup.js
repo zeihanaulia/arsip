@@ -156,8 +156,12 @@ function renderResult(result) {
 		payload.rootCaptured === false
 			? " Root tweet not captured — open the root tweet or scroll up, then download again."
 			: "";
+	const scrollerHint =
+		payload.scrollerMissing === true
+			? " Auto-expand did not run (stale tab?) — reload the tab, then download again."
+			: "";
 	setStatus(
-		`downloaded ${payload.filename} (${payload.count} tweets${mediaText}, stopped: ${payload.stoppedWhy ?? "unknown"}).${rootHint}`,
+		`downloaded ${payload.filename} (${payload.count} tweets${mediaText}, stopped: ${payload.stoppedWhy ?? "unknown"}).${rootHint}${scrollerHint}`,
 	);
 }
 

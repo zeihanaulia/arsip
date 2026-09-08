@@ -56,6 +56,63 @@ describe("x-adapter (real Chromium)", () => {
 		assert.deepEqual(result.tweets[1].media, []);
 	});
 
+	it("answers DONE with scrollerMissing when autoScroll has no scroller", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		// NOTE: x-adapter.js only — no scroller.js, like a stale tab.
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const response = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener(
+					{ type: "SCRAPE_START", payload: { autoScroll: true } },
+					{},
+					resolve,
+				);
+			});
+		});
+		const payload =
+			/** @type {{ type?: string, payload?: Record<string, unknown> }} */ (
+				response
+			);
+
+		assert.equal(payload.type, "SCRAPE_DONE");
+		assert.equal(payload.payload?.scrollerMissing, true);
+		assert.ok(
+			/** @type {unknown[]} */ (payload.payload?.tweets ?? []).length > 0,
+			"viewport tweets still scraped",
+		);
+	});
+
 	it("answers SCRAPE_ERROR instead of hanging when the adapter is missing", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
