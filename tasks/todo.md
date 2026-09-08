@@ -37,17 +37,18 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [ ] ChatGPT lolos 3 probe; spreadsheet tidak corrupt
 - [ ] Review human sebelum polish UI
 
-## Phase 3: UX + QA packaging
+## Phase 3: Mekanisme utama
 
-- [ ] Task 7: Popup UI final (preset + opsi + progress + error)
-- [ ] Task 8: Hardening + packaging + uji ChatGPT E2E
+- [ ] Task 7: Network response capture via MAIN-world hook
+- [ ] Blocker eksternal: 1 file respons GraphQL asli via DevTools
+
+## Phase 4: UX + QA packaging
+
+- [ ] Task 8: Popup UI final (preset + opsi + progress + error)
+- [ ] Task 9: Hardening + packaging + uji ChatGPT E2E
 
 ## Checkpoint: Complete
 
-- [ ] Semua acceptance Task 1-8 terpenuhi
+- [ ] Semua acceptance Task 1-9 terpenuhi
 - [ ] ZIP final siap upload ke ChatGPT tanpa missing mayor
 - [ ] Siap review; belum publish ke Web Store (out of scope v1)
-
-## Backlog (post-V1)
-
-- [ ] B1: Capture video bytes via intersepsi network (detail di `tasks/plan.md`)

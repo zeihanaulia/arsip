@@ -11,6 +11,8 @@ Sumber kebenaran: `docs/intent/x-thread-downloader.md` (intent locked), `tasks/p
 - Fetch media HANYA dari content script (konteks tab, ikut sesi login). Jangan dari popup/background — kena CORS/CSP.
 - Background service worker tipis: orkestrasi + `chrome.downloads` saja.
 - Selector DOM X HANYA di `src/x-adapter.js` dengan fallback multi-selector. File lain dilarang query DOM X langsung.
+- Parser respons API X HANYA di `src/x-graphql.js`. Field yang tidak ada di payload diisi kosong — dilarang mengarang dari pola URL.
+- Hook MAIN world (`src/hook-main.js`) HANYA membaca respons network + forward via event ke isolated world. Dilarang mengubah request, `eval`, atau akses `chrome.*` dari MAIN world.
 - Semua exporter consume satu `ThreadSnapshot` (`src/model.js`). Ubah selector ≠ ubah exporter.
 - Field yang tidak ada di DOM diisi kosong + catat di `docs/export-columns.md`. Dilarang mengarang angka (counts, user fields).
 - Permission minimal: `activeTab`, `scripting`, `downloads`. Dilarang `host_permissions` luas, `eval`, remote-code, analytics.

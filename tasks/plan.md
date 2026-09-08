@@ -252,9 +252,37 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 - [ ] Upload `thread.md`/HTML ke ChatGPT lolos 3 probe; xlsx/csv/json dibuka tanpa corrupt
 - [ ] Review dengan human sebelum polish UI
 
-### Phase 3: UX + QA packaging
+### Phase 3: Mekanisme utama (naik prioritas — DOM-only jauh dari ekspektasi)
 
-## Task 7: Popup UI final (preset tujuan + opsi + progress + error)
+## Task 7: Network response capture via MAIN-world hook
+
+**Description:** Berhenti mengandalkan DOM malas sebagai sumber utama. Hook di MAIN world membungkus `fetch`/`XHR`, menangkap respons API X (GraphQL JSON: tweet lengkap, counts asli, user lengkap, varian mp4, subtitle), teruskan ke isolated world via event, lalu ke background untuk digabung ke snapshot. DOM tetap sebagai fallback bila hook tidak dapat apa-apa. Tanpa permission baru, tanpa API key, tanpa backend — tetap hak sesi tab.
+
+**Acceptance criteria:**
+- [ ] Mekanisme hook terbukti di fixture: `fetch` yang di-stub tertangkap + payload sampai ke background (E2E)
+- [ ] Parser GraphQL X dilatih dari **respons asli yang disimpan user via DevTools** (fixture `tests/fixtures/x-graphql-*.json`): tweet, counts, user, varian mp4, subtitle terekstrak
+- [ ] Hasil gabungan: counts bukan 0 lagi bila API menyediakannya; video mp4 langsung ter-download; subtitle masuk caption; DOM fallback tidak regresi (semua test lama hijau)
+- [ ] Tidak ada request ke server manapun selain X/CDN-nya; tidak ada `eval`/remote-code; hook hanya baca respons, tidak mengubah request
+
+**Verification:**
+- [ ] E2E mekanisme (stub fetch) hijau headed
+- [ ] Parser hijau lawan fixture respons asli
+- [ ] Manual check thread Theo: counts terisi, mp4 ke-download (mode separate), subtitle ada bila API menyediakannya
+
+**Dependencies:** Task 4 (media pipeline dipakai ulang); **blocker eksternal**: butuh 1 file respons GraphQL asli dari user (DevTools Network → Save response)
+
+**Files likely touched:**
+- `src/hook-main.js` (baru, classic, world MAIN: bungkus fetch/XHR + forward event)
+- `src/content.js` (bridge event MAIN→isolated→background, pesan `API_CAPTURED`)
+- `src/background.js` (cache payload API per tab)
+- `src/x-graphql.js` (baru: parser respons → Tweet mentah; kontrak: tidak ngarang field)
+- `manifest.json` (content_scripts world MAIN kedua)
+
+**Estimated scope:** Large (5 files) — slice: mekanisme dulu, parser setelah fixture asli ada
+
+### Phase 4: UX + QA packaging
+
+## Task 8: Popup UI final (preset tujuan + opsi + progress + error)
 
 **Description:** Popup production-ready: pilih preset (`Buat LLM` → html+md+media zip; `Data` → json/csv/xlsx+media zip; `Custom` checklist format), toggle autoscroll, tombol Download, progress bar (N tweets, N media), state error yang jelas (bukan tab, login wall, thread privat/kosong).
 
@@ -277,7 +305,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 **Estimated scope:** Medium (3-4 files)
 
-## Task 8: Hardening + packaging + uji ChatGPT E2E
+## Task 9: Hardening + packaging + uji ChatGPT E2E
 
 **Description:** Keras-kan yang rapuh: fallback selector adaptor, batas memori/thread raksasa, sanitasi nama file, permission minimal (`activeTab`, `scripting`, `downloads` — tanpa `host_permissions` luas bila bisa), ikon, `README` instalasi unpacked, dan uji E2E final termasuk upload ke ChatGPT.
 
@@ -305,27 +333,13 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ### Checkpoint: Complete
 
-- [ ] Semua acceptance criteria Task 1-8 terpenuhi
+- [ ] Semua acceptance criteria Task 1-9 terpenuhi
 - [ ] ZIP final dari thread nyata bisa di-upload ke ChatGPT dan diajak diskusi tanpa missing mayor
 - [ ] Siap review manusia; belum publish ke Chrome Web Store (out of scope v1)
 
 ## Backlog (post-V1, belum di-commit ke task)
 
-### B1: Capture video bytes via intersepsi network
-
-**Konteks:** Bukti thread nyata (Task 4b): poster video ke-capture, tapi blob player X tidak bisa di-resolve dari content script (`fetch-failed` di semua kasus). Plafon DOM-only = poster + URL + alasan. Untuk bytes mp4 beneran, interupsi harus pindah ke layer network.
-
-**Pendekatan yang dipertimbangkan:**
-- `chrome.webRequest` observasional (non-blocking, diizinkan MV3) untuk mencatat varian mp4 `video.twimg.com` yang di-load player → download via `chrome.downloads` langsung (URL CDN publik, browser bawa cookies sendiri)
-- Alternatif: hook `fetch`/XHR di MAIN world untuk baca URL varian + subtitle; lebih kuat tapi lebih rapuh dan berisiko review store
-- Bukan `declarativeNetRequest` (tidak bisa baca body/URL untuk di-download)
-
-**Konsekuensi yang harus diterima kalau diambil:**
-- Permission baru (`webRequest` + host `video.twimg.com`/`pbs.twimg.com`) — melanggar prinsip "permission minimal" hari ini, perlu justifikasi privasi + review store lebih ketat
-- Subtitle (`.vtt`) X juga hidup di layer ini — B1 sekalian jawab caption yang hari ini `no-captions-in-dom`
-- Bukan DOM-only lagi: garis arsitektur "content script = DOM, background = orkestrasi" perlu direvisi
-
-**Kriteria selesai (draf):** thread video Theo ke-download mp4-nya (bukan cuma poster) + subtitle kalau ada; tidak ada regresi permission untuk user yang tidak butuh video (jadikan opt-in).
+(tidak ada — B1 network interception sudah dipromosikan jadi Task 7)
 
 ## Risks and Mitigations
 
