@@ -76,6 +76,22 @@ describe("validateSnapshot", () => {
 		);
 	});
 
+	it("accepts media-only tweets with empty text", () => {
+		const snapshot = createThreadSnapshot({
+			sourceUrl: "https://x.com/a/status/1",
+		});
+		snapshot.tweets = [
+			createTweet({
+				id: "1",
+				text: "",
+				url: "https://x.com/a/status/1",
+				media: [{ url: "https://pbs.twimg.com/media/a.jpg", type: "photo" }],
+			}),
+		];
+
+		assert.deepEqual(validateSnapshot(snapshot), []);
+	});
+
 	it("reports each problem instead of stopping at the first", () => {
 		const snapshot = createThreadSnapshot({
 			sourceUrl: "https://x.com/a/status/1",

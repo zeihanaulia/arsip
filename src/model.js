@@ -142,6 +142,9 @@ function checkRoot(snapshot, errors) {
 }
 
 /**
+ * Media-only tweets (image/video replies without text) are real, so
+ * only id and url are required. An empty text is data, not damage.
+ *
  * @param {Tweet} tweet
  * @param {number} index
  * @param {string[]} errors
@@ -150,9 +153,6 @@ function checkTweet(tweet, index, errors) {
 	const where = `tweets[${index}]`;
 	if (typeof tweet?.id !== "string" || tweet.id.trim() === "") {
 		errors.push(`${where}.id must be a non-empty string`);
-	}
-	if (typeof tweet?.text !== "string" || tweet.text.trim() === "") {
-		errors.push(`${where}.text must be a non-empty string`);
 	}
 	if (typeof tweet?.url !== "string" || tweet.url.trim() === "") {
 		errors.push(`${where}.url must be a non-empty string`);
