@@ -253,7 +253,7 @@ export function isRootCaptured(snapshot) {
  *
  * @param {Record<string, unknown>} [progress] Last scroller progress.
  * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown }} [options]
- * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, caps?: Record<string, unknown> }}
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, caps?: Record<string, unknown>, expandError?: string }}
  */
 export function captureStats(progress = {}, options = {}) {
 	const stoppedWhy =
@@ -272,6 +272,9 @@ export function captureStats(progress = {}, options = {}) {
 		videoMode,
 		rootCaptured: options.rootCaptured !== false,
 	};
+	if (typeof progress.expandError === "string" && progress.expandError !== "") {
+		return { ...stats, expandError: progress.expandError };
+	}
 	const caps = /** @type {Record<string, unknown>} */ (options.caps ?? {});
 	if (typeof options.caps === "object" && options.caps !== null) {
 		return { ...stats, caps };

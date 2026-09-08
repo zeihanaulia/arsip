@@ -364,6 +364,23 @@ describe("captureStats", () => {
 			rootCaptured: true,
 		});
 	});
+
+	it("carries the expand error message for diagnosis", () => {
+		assert.deepEqual(
+			captureStats(
+				{ stoppedWhy: "expand-error", batches: 0, expandError: "boom" },
+				{},
+			),
+			{
+				stoppedWhy: "expand-error",
+				batches: 0,
+				autoScroll: false,
+				videoMode: "bundle",
+				rootCaptured: true,
+				expandError: "boom",
+			},
+		);
+	});
 });
 
 describe("filenameForSnapshot", () => {

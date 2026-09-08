@@ -176,6 +176,8 @@ async function expandThread(scroller) {
 	} catch (error) {
 		postProgress({
 			phase: "scraping",
+			stoppedWhy: "expand-error",
+			batches: 0,
 			expandError: error instanceof Error ? error.message : "unknown error",
 		});
 	}
