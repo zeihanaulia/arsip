@@ -337,7 +337,12 @@ describe("captureStats", () => {
 		assert.deepEqual(
 			captureStats(
 				{ stoppedWhy: "idle", batches: 12 },
-				{ autoScroll: true, videoMode: "separate", rootCaptured: true },
+				{
+					autoScroll: true,
+					videoMode: "separate",
+					rootCaptured: true,
+					caps: { scroller: true, media: true, zip: true, sheet: true },
+				},
 			),
 			{
 				stoppedWhy: "idle",
@@ -345,6 +350,7 @@ describe("captureStats", () => {
 				autoScroll: true,
 				videoMode: "separate",
 				rootCaptured: true,
+				caps: { scroller: true, media: true, zip: true, sheet: true },
 			},
 		);
 	});

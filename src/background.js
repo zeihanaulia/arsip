@@ -149,7 +149,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		});
 	}
 	const payload =
-		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[], scrollerMissing?: unknown }} */ (
+		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[], scrollerMissing?: unknown, caps?: unknown }} */ (
 			reply.payload
 		);
 	const sourceUrl =
@@ -168,6 +168,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		autoScroll,
 		videoMode,
 		rootCaptured,
+		caps: payload.caps,
 	});
 	const archiveFilename = archiveFilenameForSnapshot(snapshot);
 	const separateDir = separateDirForArchive(archiveFilename);

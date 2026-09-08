@@ -245,15 +245,15 @@ export function isRootCaptured(snapshot) {
 	}
 	return (snapshot?.tweets ?? []).some((tweet) => tweet.id === sourceId);
 }
-
 /**
  * Builds the capture provenance block stored on the snapshot: why the
- * run stopped and under which options. Future 23-of-184 mysteries get
- * answered by reading the file instead of guessing.
+ * run stopped, under which options, and what the tab had injected.
+ * Future 23-of-184 mysteries get answered by reading the file instead
+ * of guessing.
  *
  * @param {Record<string, unknown>} [progress] Last scroller progress.
- * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown }} [options]
- * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean }}
+ * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown }} [options]
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, caps?: Record<string, unknown> }}
  */
 export function captureStats(progress = {}, options = {}) {
 	const stoppedWhy =
@@ -265,13 +265,18 @@ export function captureStats(progress = {}, options = {}) {
 		options.videoMode === "separate" || options.videoMode === "posters-only"
 			? options.videoMode
 			: "bundle";
-	return {
+	const stats = {
 		stoppedWhy,
 		batches,
 		autoScroll: options.autoScroll === true,
 		videoMode,
 		rootCaptured: options.rootCaptured !== false,
 	};
+	const caps = /** @type {Record<string, unknown>} */ (options.caps ?? {});
+	if (typeof options.caps === "object" && options.caps !== null) {
+		return { ...stats, caps };
+	}
+	return stats;
 }
 
 /**

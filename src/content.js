@@ -138,6 +138,7 @@ async function runScrape(autoScroll, videoMode) {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
 		scrollerMissing,
+		caps: capabilities(),
 		media: await downloadThreadMedia(tweets, videoMode),
 	});
 }
