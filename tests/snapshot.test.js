@@ -381,6 +381,13 @@ describe("captureStats", () => {
 			},
 		);
 	});
+
+	it("keeps the last phase so mounting overwrites stay visible", () => {
+		assert.deepEqual(
+			captureStats({ phase: "mounting", batches: 6 }, {}).phase,
+			"mounting",
+		);
+	});
 });
 
 describe("filenameForSnapshot", () => {

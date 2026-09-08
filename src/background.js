@@ -47,7 +47,7 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_PROGRESS) {
-		lastProgress = { ...raw.payload };
+		lastProgress = { ...lastProgress, ...raw.payload };
 		respond(createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, { received: true }));
 		return false;
 	}
