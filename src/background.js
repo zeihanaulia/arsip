@@ -113,9 +113,25 @@ async function downloadThread(autoScroll, videoMode) {
 	} catch (error) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNEXPECTED",
-			detail: error instanceof Error ? error.message : "unknown error",
+			detail: withTabHint(error),
 		});
 	}
+}
+
+/**
+ * Maps known channel failures to actionable hints. A reloaded extension
+ * orphans the content scripts of already-open tabs — the most common
+ * cause by far — so say so instead of quoting Chrome internals.
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
+function withTabHint(error) {
+	const detail = error instanceof Error ? error.message : "unknown error";
+	if (detail.includes("Receiving end does not exist")) {
+		return `${detail} (reload the X tab — the extension was reloaded after it opened)`;
+	}
+	return detail;
 }
 
 /**
