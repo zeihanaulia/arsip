@@ -56,6 +56,76 @@ describe("x-adapter (real Chromium)", () => {
 		assert.deepEqual(result.tweets[1].media, []);
 	});
 
+	it("reports injected capabilities on PING so stale tabs are visible", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+
+		async function pingWith(/** @type {string[]} */ scripts) {
+			const page = await browser.newPage();
+			await page.addInitScript(() => {
+				const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+				holder.__listeners = [];
+				Object.assign(globalThis, {
+					chrome: {
+						runtime: {
+							onMessage: {
+								addListener: (/** @type {unknown} */ fn) => {
+									holder.__listeners?.push(fn);
+								},
+							},
+							sendMessage: async () => ({}),
+						},
+					},
+				});
+			});
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+			);
+			for (const script of scripts) {
+				await page.addScriptTag({ path: join(root, script) });
+			}
+			const response = await page.evaluate(() => {
+				const holder =
+					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+						globalThis
+					);
+				const listener = holder.__listeners?.[0];
+				if (!listener) {
+					throw new Error("content script did not register a listener");
+				}
+				return new Promise((resolve) => {
+					listener({ type: "PING", payload: {} }, {}, resolve);
+				});
+			});
+			await page.close();
+			return /** @type {{ payload?: Record<string, unknown> }} */ (response)
+				.payload;
+		}
+
+		const full = await pingWith([
+			"src/x-adapter.js",
+			"src/scroller.js",
+			"vendor/jszip.min.js",
+			"vendor/xlsx.full.min.js",
+			"src/media.js",
+			"src/content.js",
+		]);
+		const stale = await pingWith(["src/x-adapter.js", "src/content.js"]);
+
+		assert.deepEqual(full?.caps, {
+			scroller: true,
+			media: true,
+			zip: true,
+			sheet: true,
+		});
+		assert.deepEqual(stale?.caps, {
+			scroller: false,
+			media: false,
+			zip: false,
+			sheet: false,
+		});
+	});
+
 	it("answers DONE with scrollerMissing when autoScroll has no scroller", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

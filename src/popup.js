@@ -237,9 +237,19 @@ async function pingContentScript() {
 			tab.id,
 			createMessage(MESSAGE_TYPES.PING),
 		);
-		return isMessage(reply) && reply.payload.connected === true
-			? "connected: true"
-			: "connected: false";
+		if (!isMessage(reply) || reply.payload.connected !== true) {
+			return "connected: false";
+		}
+		const caps = /** @type {Record<string, unknown>} */ (
+			reply.payload.caps ?? {}
+		);
+		const missing = ["scroller", "media", "zip", "sheet"].filter(
+			(key) => caps[key] !== true,
+		);
+		if (missing.length === 0) {
+			return "connected: true";
+		}
+		return `connected: true — stale tab, missing: ${missing.join(", ")} (reload the tab)`;
 	} catch (error) {
 		return error instanceof Error
 			? `not reachable: ${error.message}`

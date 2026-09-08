@@ -49,6 +49,26 @@ function isKnownMessage(value) {
 }
 
 /**
+ * Reports which companion scripts share this tab. A stale tab (opened
+ * before an extension update) answers PING but lacks newer scripts —
+ * the popup turns that into a reload hint instead of a silent miss.
+ *
+ * @returns {{ scroller: boolean, media: boolean, zip: boolean, sheet: boolean }}
+ */
+function capabilities() {
+	const globals =
+		/** @type {{ XScroller?: unknown, XMedia?: unknown, JSZip?: unknown, XLSX?: unknown }} */ (
+			globalThis
+		);
+	return {
+		scroller: typeof globals.XScroller !== "undefined",
+		media: typeof globals.XMedia !== "undefined",
+		zip: typeof globals.JSZip !== "undefined",
+		sheet: typeof globals.XLSX !== "undefined",
+	};
+}
+
+/**
  * Cooperative cancel flag, set by SCRAPE_CANCEL between scroll batches.
  * @type {boolean}
  */
@@ -419,7 +439,9 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.PING) {
-		respond(reply(MESSAGE_TYPES.PING, { connected: true }));
+		respond(
+			reply(MESSAGE_TYPES.PING, { connected: true, caps: capabilities() }),
+		);
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_CANCEL) {
