@@ -205,6 +205,13 @@ async function scrapeAndDownload(options) {
 		sourceUrl,
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
+	if (snapshot.tweets.length === 0) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "EMPTY_THREAD",
+			detail:
+				"No tweets detected — open a thread (not home or an empty page) and try again.",
+		});
+	}
 	const apiAdded = mergeCapturedApi(snapshot, payload.api);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);

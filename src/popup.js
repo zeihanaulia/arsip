@@ -13,6 +13,7 @@ const videoModeBox = document.querySelector("#videomode");
 const netlogButton = document.querySelector("#netlog");
 const presetBox = document.querySelector("#preset");
 const customFormats = document.querySelector("#custom-formats");
+const progressBar = document.querySelector("#progress");
 
 const PRESET_FORMATS = [
 	"thread.html",
@@ -258,6 +259,9 @@ function setButtons(state) {
 	}
 	if (cancelButton instanceof HTMLButtonElement) {
 		cancelButton.disabled = !state.downloading;
+	}
+	if (progressBar instanceof HTMLProgressElement) {
+		progressBar.hidden = !state.downloading;
 	}
 }
 

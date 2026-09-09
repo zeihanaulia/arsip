@@ -30,6 +30,16 @@ button:disabled {
 	opacity: 0.5;
 }
 
+progress {
+	display: block;
+	width: 100%;
+	margin-top: 12px;
+}
+
+progress[hidden] {
+	display: none;
+}
+
 label.check {
 	display: flex;
 	align-items: center;

@@ -109,6 +109,13 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		const status = await page.textContent("#status");
 		assert.match(status ?? "", /3 tweets/);
 		assert.match(status ?? "", /stopped: idle/);
+		assert.equal(
+			await page.$eval(
+				"#progress",
+				(bar) => /** @type {HTMLProgressElement} */ (bar).hidden,
+			),
+			true,
+		);
 		await page.screenshot({ path: join(tmpdir(), "xdl-popup.png") });
 		assert.deepEqual(problems, []);
 	});
