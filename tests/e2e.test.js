@@ -428,6 +428,24 @@ describe("x-adapter (real Chromium)", () => {
 		]);
 	});
 
+	it("marks promoted tweets by analytics URL and ad badge", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-ads.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = await page.evaluate(() =>
+			globalThis.XAdapter.scrapeRaw(document, location.href),
+		);
+
+		assert.equal(result.tweets.length, 2);
+		assert.equal(result.tweets[0].promoted, false);
+		assert.equal(result.tweets[1].promoted, true);
+	});
+
 	it("inventories photo posters and video sources without fetching", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

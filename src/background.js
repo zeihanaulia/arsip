@@ -79,7 +79,7 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 
 /**
  * @param {import("./messaging.js").Message} message
- * @returns {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }}
+ * @returns {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean }}
  */
 function readScrapeOptions(message) {
 	const payload = /** @type {Record<string, unknown>} */ (
@@ -101,6 +101,7 @@ function readScrapeOptions(message) {
 		videoMode,
 		preset,
 		formats,
+		skipPromoted: payload.skipPromoted !== false,
 	};
 }
 
@@ -148,7 +149,7 @@ async function dumpNetworkLog() {
  * media, attach thread relations, validate, bundle or split videos,
  * download the archive. Never rejects: the popup polls for the result.
  *
- * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }} options
+ * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean }} options
  * @returns {Promise<import("./messaging.js").Message>}
  */
 async function downloadThread(options) {
@@ -179,13 +180,17 @@ function withTabHint(error) {
 }
 
 /**
- * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }} options
+ * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean }} options
  * @returns {Promise<import("./messaging.js").Message>}
  */
 async function scrapeAndDownload(options) {
-	const { autoScroll, videoMode, preset, formats } = options;
+	const { autoScroll, videoMode, preset, formats, skipPromoted } = options;
 	const reply = await forwardToActiveTab(
-		createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll, videoMode }),
+		createMessage(MESSAGE_TYPES.SCRAPE_START, {
+			autoScroll,
+			videoMode,
+			skipPromoted,
+		}),
 	);
 	if (!isMessage(reply) || reply.type !== MESSAGE_TYPES.SCRAPE_DONE) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
@@ -203,6 +208,8 @@ async function scrapeAndDownload(options) {
 			/** @type {unknown} */ (payload.tweets ?? [])
 		),
 		sourceUrl,
+		undefined,
+		{ skipPromoted },
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
 	if (snapshot.tweets.length === 0) {

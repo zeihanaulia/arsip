@@ -9,6 +9,7 @@ const pingButton = document.querySelector("#ping");
 const downloadButton = document.querySelector("#download");
 const cancelButton = document.querySelector("#cancel");
 const autoscrollBox = document.querySelector("#autoscroll");
+const skipPromotedBox = document.querySelector("#skippromoted");
 const videoModeBox = document.querySelector("#videomode");
 const netlogButton = document.querySelector("#netlog");
 const presetBox = document.querySelector("#preset");
@@ -78,6 +79,8 @@ async function downloadVisibleThread() {
 	const autoScroll =
 		autoscrollBox instanceof HTMLInputElement && autoscrollBox.checked;
 	const videoMode = readVideoMode();
+	const skipPromoted =
+		!(skipPromotedBox instanceof HTMLInputElement) || skipPromotedBox.checked;
 	const { preset, formats } = readPreset();
 	setButtons({ downloading: true });
 	setStatus(autoScroll ? "expanding thread…" : "scraping visible tweets…");
@@ -89,6 +92,7 @@ async function downloadVisibleThread() {
 					videoMode,
 					preset,
 					formats,
+					skipPromoted,
 				}),
 			),
 			10_000,

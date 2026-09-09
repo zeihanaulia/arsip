@@ -14,6 +14,7 @@
  * @property {{ id?: string, name?: string, screenName?: string, avatarUrl?: string }} [user]
  * @property {{ url: string, type: string }[]} [media]
  * @property {{ replies?: number, reposts?: number, likes?: number, views?: number }} [metrics]
+ * @property {boolean} [promoted]
  */
 
 const SELECTORS = {
@@ -95,6 +96,37 @@ function identify(article) {
 }
 
 /**
+ * Promoted tweets carry an analytics URL, a small Ad/Promoted badge, or
+ * both. The badge check stays clear of the tweet text (exact match on
+ * short spans only) so a tweet merely saying "ad" is never flagged.
+ *
+ * @param {Element} article
+ * @param {string} href Status link href ("" when absent).
+ * @returns {boolean}
+ */
+function isPromoted(article, href) {
+	if (href.includes("/analytics")) {
+		return true;
+	}
+	const text = queryFirst(article, SELECTORS.text);
+	for (const el of article.querySelectorAll("span,div")) {
+		if (text?.contains(el)) {
+			continue;
+		}
+		const label = (el.textContent ?? "").trim();
+		if (
+			label !== "" &&
+			label.length < 20 &&
+			/^(ad|promoted|iklan)$/i.test(label) &&
+			el.children.length === 0
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * @param {Element} article
  * @returns {{ name: string, screenName: string, avatarUrl: string }}
  */
@@ -150,6 +182,7 @@ function parseTweet(article) {
 		user: parseUser(article),
 		media: collectMedia(article),
 		metrics: parseMetrics(article),
+		promoted: isPromoted(article, id.url),
 	};
 }
 

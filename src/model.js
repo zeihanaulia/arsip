@@ -54,6 +54,7 @@
  * @property {string | null} replyTo Parent tweet id, null for the thread root.
  * @property {string} conversationId
  * @property {boolean} inferred True when order/relation was derived from DOM order, not explicit data.
+ * @property {boolean} [promoted] Paid placement (analytics URL or ad badge).
  * @property {string} [language] API-only (no DOM source).
  * @property {boolean} [favorited] API-only viewer relation.
  * @property {boolean} [retweeted] API-only viewer relation.
@@ -103,6 +104,7 @@ export function createTweet(partial = {}) {
 		replyTo: partial.replyTo ?? null,
 		conversationId: partial.conversationId ?? "",
 		inferred: partial.inferred ?? false,
+		promoted: partial.promoted ?? false,
 		user: { id: "", name: "", screenName: "", avatarUrl: "", ...user },
 		media: [...media],
 		metrics: { ...zeroMetrics(), ...metrics },

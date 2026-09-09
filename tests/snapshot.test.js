@@ -38,6 +38,21 @@ const RAW_REPLY = {
 };
 
 describe("assembleSnapshot", () => {
+	it("skips promoted tweets when asked, keeps them by default", () => {
+		const raw = [{ ...RAW_ROOT }, { ...RAW_REPLY, promoted: true }];
+
+		assert.equal(
+			assembleSnapshot(raw, "https://x.com/a/status/1").tweets.length,
+			2,
+		);
+		assert.deepEqual(
+			assembleSnapshot(raw, "https://x.com/a/status/1", undefined, {
+				skipPromoted: true,
+			}).tweets.map((t) => t.id),
+			[RAW_ROOT.id],
+		);
+	});
+
 	it("turns raw adapter output into a valid snapshot", () => {
 		const snapshot = assembleSnapshot(
 			[RAW_ROOT, RAW_REPLY],

@@ -187,10 +187,6 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		await page.addInitScript(() => {
 			/** @type {unknown[]} */
 			const sent = [];
-		});
-		await page.addInitScript(() => {
-			/** @type {unknown[]} */
-			const sent = [];
 			Object.assign(globalThis, {
 				__sent: sent,
 				chrome: {
@@ -254,6 +250,7 @@ describe("popup UI (stubbed chrome APIs)", () => {
 			videoMode: "separate",
 			preset: "custom",
 			formats: ["thread.md", "thread.csv"],
+			skipPromoted: true,
 		});
 		assert.deepEqual(problems, []);
 	});

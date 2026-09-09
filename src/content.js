@@ -118,13 +118,14 @@ let cancelRequested = false;
 
 /**
  * @param {unknown} raw
- * @returns {{ autoScroll: boolean, videoMode: string }}
+ * @returns {{ autoScroll: boolean, videoMode: string, skipPromoted: boolean }}
  */
 function readScrapeOptions(raw) {
 	const payload = /** @type {{ payload?: unknown }} */ (raw).payload;
-	const options = /** @type {{ autoScroll?: unknown, videoMode?: unknown }} */ (
-		payload ?? {}
-	);
+	const options =
+		/** @type {{ autoScroll?: unknown, videoMode?: unknown, skipPromoted?: unknown }} */ (
+			payload ?? {}
+		);
 	return {
 		autoScroll: options.autoScroll === true,
 		videoMode:
@@ -133,6 +134,7 @@ function readScrapeOptions(raw) {
 			options.videoMode === "posters-only"
 				? options.videoMode
 				: "bundle",
+		skipPromoted: options.skipPromoted !== false,
 	};
 }
 
@@ -158,9 +160,10 @@ function postProgress(stats) {
 /**
  * @param {boolean} autoScroll
  * @param {string} videoMode "bundle" | "separate" | "posters-only".
+ * @param {boolean} skipPromoted Drop paid placements before downloading.
  * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
  */
-async function runScrape(autoScroll, videoMode) {
+async function runScrape(autoScroll, videoMode, skipPromoted) {
 	cancelRequested = false;
 	const scroller = readScroller();
 	const collected = new Map();
@@ -180,10 +183,12 @@ async function runScrape(autoScroll, videoMode) {
 		return scraped;
 	}
 	accumulateBatch(collected);
-	const tweets =
+	const tweets = dropPromoted(
 		collected.size > 0
 			? [...collected.values()]
-			: /** @type {unknown[]} */ (scraped.payload.tweets ?? []);
+			: /** @type {unknown[]} */ (scraped.payload.tweets ?? []),
+		skipPromoted,
+	);
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
@@ -191,6 +196,26 @@ async function runScrape(autoScroll, videoMode) {
 		caps: capabilities(),
 		api: timelineApiBodies(),
 		media: await downloadThreadMedia(tweets, videoMode),
+	});
+}
+
+/**
+ * Drops paid placements so their media is never fetched. Off by
+ * explicit opt-out only.
+ *
+ * @param {unknown[]} tweets
+ * @param {boolean} skip
+ * @returns {unknown[]}
+ */
+function dropPromoted(tweets, skip) {
+	if (!skip) {
+		return tweets;
+	}
+	return (tweets ?? []).filter((raw) => {
+		if (!raw || typeof raw !== "object") {
+			return true;
+		}
+		return /** @type {{ promoted?: unknown }} */ (raw).promoted !== true;
 	});
 }
 
@@ -564,7 +589,9 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
 		const options = readScrapeOptions(raw);
-		runScrape(options.autoScroll, options.videoMode).then(respond);
+		runScrape(options.autoScroll, options.videoMode, options.skipPromoted).then(
+			respond,
+		);
 		return true;
 	}
 	if (raw.type === MESSAGE_TYPES.BUILD_ZIP) {

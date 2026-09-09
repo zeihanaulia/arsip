@@ -12,14 +12,27 @@ import {
  * @param {import("./model.js").TweetInput[]} rawTweets Adapter output; entries without an id are dropped.
  * @param {string} sourceUrl
  * @param {string} [scrapedAt]
+ * @param {{ skipPromoted?: boolean }} [options] Drop promoted tweets (default keeps).
  * @returns {import("./model.js").ThreadSnapshot}
  */
-export function assembleSnapshot(rawTweets, sourceUrl, scrapedAt) {
+export function assembleSnapshot(
+	rawTweets,
+	sourceUrl,
+	scrapedAt,
+	options = {},
+) {
 	const tweets = [];
 	const seen = new Set();
 	for (const raw of rawTweets ?? []) {
 		const id = typeof raw?.id === "string" ? raw.id.trim() : "";
 		if (id === "" || seen.has(id)) {
+			continue;
+		}
+		const promoted =
+			typeof raw === "object" &&
+			raw !== null &&
+			/** @type {{ promoted?: unknown }} */ (raw).promoted === true;
+		if (promoted && options.skipPromoted === true) {
 			continue;
 		}
 		seen.add(id);
