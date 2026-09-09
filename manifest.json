@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"name": "X Thread Downloader",
+	"name": "Arsip",
 	"version": "0.1.0",
 	"description": "Download thread X yang lagi dibuka beserta media lokal, export HTML/MD/JSON/CSV/XLSX.",
 	"permissions": ["activeTab", "scripting", "downloads"],

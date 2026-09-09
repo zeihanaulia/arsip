@@ -6,11 +6,13 @@ import {
 	assembleSnapshot,
 	assignThreadRelations,
 	base64ToText,
+	buildErrorsFile,
 	buildMediaManifest,
 	captionsToText,
 	captureStats,
 	enrichSnapshotMedia,
 	filenameForSnapshot,
+	filterFilesByPreset,
 	isRootCaptured,
 	separateDirForArchive,
 	snapshotToDataUrl,
@@ -339,6 +341,66 @@ describe("isRootCaptured", () => {
 		snapshot.sourceUrl = "https://x.com/home";
 
 		assert.equal(isRootCaptured(snapshot), true);
+	});
+});
+
+describe("filterFilesByPreset", () => {
+	const files = [
+		{ name: "thread.html" },
+		{ name: "thread.md" },
+		{ name: "thread.json" },
+		{ name: "thread.csv" },
+		{ name: "thread.xlsx" },
+		{ name: "media-manifest.json" },
+		{ name: "media/1-0.jpg" },
+	];
+
+	it("llm preset keeps reading formats plus manifest and media", () => {
+		assert.deepEqual(
+			filterFilesByPreset(files, "llm", []).map((file) => file.name),
+			["thread.html", "thread.md", "media-manifest.json", "media/1-0.jpg"],
+		);
+	});
+
+	it("data preset keeps data formats plus manifest and media", () => {
+		assert.deepEqual(
+			filterFilesByPreset(files, "data", []).map((file) => file.name),
+			[
+				"thread.json",
+				"thread.csv",
+				"thread.xlsx",
+				"media-manifest.json",
+				"media/1-0.jpg",
+			],
+		);
+	});
+
+	it("custom preset keeps exactly the checked formats", () => {
+		assert.deepEqual(
+			filterFilesByPreset(files, "custom", ["thread.md", "thread.csv"]).map(
+				(file) => file.name,
+			),
+			["thread.md", "thread.csv", "media-manifest.json", "media/1-0.jpg"],
+		);
+	});
+
+	it("falls back to everything on unknown presets", () => {
+		assert.equal(filterFilesByPreset(files, "nope", []).length, files.length);
+	});
+});
+
+describe("buildErrorsFile", () => {
+	it("returns null when nothing failed", () => {
+		assert.equal(buildErrorsFile([]), null);
+	});
+
+	it("lists unresolved media with reasons", () => {
+		const file = buildErrorsFile([
+			{ url: "blob:https://x.com/u", unresolved: "fetch-failed" },
+		]);
+
+		assert.equal(file?.name, "errors.json");
+		assert.ok(JSON.parse(file?.text ?? "{}").unresolved.length === 1);
 	});
 });
 

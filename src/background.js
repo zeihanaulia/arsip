@@ -18,9 +18,11 @@ import {
 	archiveFilenameForSnapshot,
 	assembleSnapshot,
 	assignThreadRelations,
+	buildErrorsFile,
 	buildMediaManifest,
 	captureStats,
 	enrichSnapshotMedia,
+	filterFilesByPreset,
 	isRootCaptured,
 	separateDirForArchive,
 	splitMediaForMode,
@@ -42,7 +44,8 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
 		lastProgress = { phase: "scraping", tweets: 0, batches: 0 };
 		lastResult = null;
-		downloadThread(readAutoScroll(raw), readVideoMode(raw)).then((result) => {
+		const options = readScrapeOptions(raw);
+		downloadThread(options).then((result) => {
 			lastResult = result;
 		});
 		respond(createMessage(MESSAGE_TYPES.SCRAPE_PROGRESS, { phase: "started" }));
@@ -76,32 +79,29 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 
 /**
  * @param {import("./messaging.js").Message} message
- * @returns {boolean}
+ * @returns {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }}
  */
-function readAutoScroll(message) {
-	const payload = message.payload ?? {};
-	return (
-		typeof payload === "object" &&
-		payload !== null &&
-		/** @type {{ autoScroll?: unknown }} */ (payload).autoScroll === true
-	);
-}
-
-/**
- * UI default is "separate" (videos are heavy and LLMs cannot watch
- * them); unknown values fall back to "bundle" (single artifact).
- *
- * @param {import("./messaging.js").Message} message
- * @returns {string}
- */
-function readVideoMode(message) {
-	const payload = /** @type {{ videoMode?: unknown }} */ (
+function readScrapeOptions(message) {
+	const payload = /** @type {Record<string, unknown>} */ (
 		message.payload ?? {}
 	);
-	return payload.videoMode === "separate" ||
-		payload.videoMode === "posters-only"
-		? payload.videoMode
-		: "bundle";
+	const videoMode =
+		payload.videoMode === "bundle" || payload.videoMode === "posters-only"
+			? payload.videoMode
+			: "separate";
+	const preset =
+		payload.preset === "data" || payload.preset === "custom"
+			? payload.preset
+			: "llm";
+	const formats = Array.isArray(payload.formats)
+		? payload.formats.filter((name) => typeof name === "string")
+		: [];
+	return {
+		autoScroll: payload.autoScroll === true,
+		videoMode,
+		preset,
+		formats,
+	};
 }
 
 /**
@@ -148,13 +148,12 @@ async function dumpNetworkLog() {
  * media, attach thread relations, validate, bundle or split videos,
  * download the archive. Never rejects: the popup polls for the result.
  *
- * @param {boolean} autoScroll
- * @param {string} videoMode
+ * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }} options
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function downloadThread(autoScroll, videoMode) {
+async function downloadThread(options) {
 	try {
-		return await scrapeAndDownload(autoScroll, videoMode);
+		return await scrapeAndDownload(options);
 	} catch (error) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "UNEXPECTED",
@@ -180,11 +179,11 @@ function withTabHint(error) {
 }
 
 /**
- * @param {boolean} autoScroll
- * @param {string} videoMode
+ * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[] }} options
  * @returns {Promise<import("./messaging.js").Message>}
  */
-async function scrapeAndDownload(autoScroll, videoMode) {
+async function scrapeAndDownload(options) {
+	const { autoScroll, videoMode, preset, formats } = options;
 	const reply = await forwardToActiveTab(
 		createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll, videoMode }),
 	);
@@ -206,7 +205,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		sourceUrl,
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
-	mergeCapturedApi(snapshot, payload.api);
+	const apiAdded = mergeCapturedApi(snapshot, payload.api);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);
 	const rootCaptured = isRootCaptured(snapshot);
@@ -217,6 +216,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		rootCaptured,
 		caps: payload.caps,
 		apiBodies: apiBodies.length,
+		apiAdded,
 	});
 	const archiveFilename = archiveFilenameForSnapshot(snapshot);
 	const separateDir = separateDirForArchive(archiveFilename);
@@ -236,7 +236,10 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	}
 	const zipReply = await forwardToActiveTab(
 		createMessage(MESSAGE_TYPES.BUILD_ZIP, {
-			files: zipFiles(snapshot, manifest, zipMedia, separateOk),
+			files: withErrorsFile(
+				zipFiles(snapshot, manifest, zipMedia, separateOk, preset, formats),
+				mediaItems,
+			),
 		}),
 	);
 	if (
@@ -315,26 +318,39 @@ async function downloadSeparateVideos(separateMedia, separateDir) {
 
 /**
  * Parses captured timeline API bodies and merges tweet truth into the
- * DOM snapshot. Unparseable bodies are skipped — the DOM result stands
- * on its own, API is strictly an upgrade path.
+ * DOM snapshot. Returns how many API-only tweets were appended so the
+ * capture block can tell enrichment apart from real additions.
+ * Unparseable bodies are skipped — the DOM result stands on its own,
+ * API is strictly an upgrade path.
  *
  * @param {import("./model.js").ThreadSnapshot} snapshot Mutated in place.
  * @param {unknown} raw
+ * @returns {number} API-only tweets appended.
  */
 function mergeCapturedApi(snapshot, raw) {
 	if (!Array.isArray(raw)) {
-		return;
+		return 0;
 	}
-	for (const body of raw.slice(0, 5)) {
+	const before = new Set((snapshot?.tweets ?? []).map((tweet) => tweet.id));
+	const apiTweets = [];
+	for (const body of raw.slice(0, 15)) {
 		if (typeof body !== "string" || body === "") {
 			continue;
 		}
 		try {
-			mergeApiIntoSnapshot(snapshot, extractRawTweets(JSON.parse(body)));
+			apiTweets.push(...extractRawTweets(JSON.parse(body)));
 		} catch {
 			// Corrupt captures must not kill a good DOM snapshot.
 		}
 	}
+	mergeApiIntoSnapshot(snapshot, apiTweets);
+	let added = 0;
+	for (const tweet of snapshot?.tweets ?? []) {
+		if (!before.has(tweet.id)) {
+			added += 1;
+		}
+	}
+	return added;
 }
 
 /**
@@ -380,27 +396,33 @@ function manifestItems(raw, separateOk, separateDir) {
  * @param {Record<string, object>} manifest
  * @param {unknown[]} zipMedia Raw items selected for bundling.
  * @param {Set<string>} separateOk URLs already downloaded separately.
+ * @param {string} preset
+ * @param {string[]} formats Checked names for the custom preset.
  * @returns {{ name: string, text?: string, base64?: string, sheet?: { columns: string[], rows: string[][] } }[]}
  */
-function zipFiles(snapshot, manifest, zipMedia, separateOk) {
+function zipFiles(snapshot, manifest, zipMedia, separateOk, preset, formats) {
 	const /** @type {{ name: string, text?: string, base64?: string, sheet?: { columns: string[], rows: string[][] } }[]} */ files =
-			[
-				{ name: "thread.json", text: JSON.stringify(snapshot, null, 2) },
-				{
-					name: "media-manifest.json",
-					text: JSON.stringify(manifest, null, 2),
-				},
-				{ name: "thread.html", text: renderThreadHtml(snapshot) },
-				{ name: "thread.md", text: renderThreadMarkdown(snapshot) },
-				{ name: "thread.csv", text: snapshotToCsv(snapshot) },
-				{
-					name: "thread.xlsx",
-					sheet: {
-						columns: [...THREAD_COLUMNS],
-						rows: snapshotToRows(snapshot).slice(1),
+			filterFilesByPreset(
+				[
+					{ name: "thread.json", text: JSON.stringify(snapshot, null, 2) },
+					{
+						name: "media-manifest.json",
+						text: JSON.stringify(manifest, null, 2),
 					},
-				},
-			];
+					{ name: "thread.html", text: renderThreadHtml(snapshot) },
+					{ name: "thread.md", text: renderThreadMarkdown(snapshot) },
+					{ name: "thread.csv", text: snapshotToCsv(snapshot) },
+					{
+						name: "thread.xlsx",
+						sheet: {
+							columns: [...THREAD_COLUMNS],
+							rows: snapshotToRows(snapshot).slice(1),
+						},
+					},
+				],
+				preset,
+				formats,
+			);
 	for (const entry of zipMedia ?? []) {
 		const item = /** @type {Record<string, unknown>} */ (entry ?? {});
 		if (
@@ -410,6 +432,22 @@ function zipFiles(snapshot, manifest, zipMedia, separateOk) {
 		) {
 			files.push({ name: item.localPath, base64: item.base64 });
 		}
+	}
+	return files;
+}
+
+/**
+ * Appends errors.json when media failed partially. The archive stays
+ * downloadable — partial failure is data, not a reason to fail.
+ *
+ * @param {{ name: string, text?: string, base64?: string, sheet?: object }[]} files
+ * @param {{ url: string, type: string, unresolved?: string }[]} mediaItems
+ * @returns {{ name: string, text?: string, base64?: string, sheet?: object }[]}
+ */
+function withErrorsFile(files, mediaItems) {
+	const errorsFile = buildErrorsFile(mediaItems);
+	if (errorsFile) {
+		files.push(errorsFile);
 	}
 	return files;
 }

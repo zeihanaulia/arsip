@@ -11,6 +11,16 @@ const cancelButton = document.querySelector("#cancel");
 const autoscrollBox = document.querySelector("#autoscroll");
 const videoModeBox = document.querySelector("#videomode");
 const netlogButton = document.querySelector("#netlog");
+const presetBox = document.querySelector("#preset");
+const customFormats = document.querySelector("#custom-formats");
+
+const PRESET_FORMATS = [
+	"thread.html",
+	"thread.md",
+	"thread.json",
+	"thread.csv",
+	"thread.xlsx",
+];
 
 /** @type {boolean} */
 let polling = false;
@@ -22,6 +32,13 @@ pingButton?.addEventListener("click", async () => {
 
 downloadButton?.addEventListener("click", async () => {
 	await downloadVisibleThread();
+});
+
+presetBox?.addEventListener("change", () => {
+	if (customFormats instanceof HTMLFieldSetElement) {
+		customFormats.hidden =
+			!(presetBox instanceof HTMLSelectElement) || presetBox.value !== "custom";
+	}
 });
 
 netlogButton?.addEventListener("click", async () => {
@@ -60,12 +77,18 @@ async function downloadVisibleThread() {
 	const autoScroll =
 		autoscrollBox instanceof HTMLInputElement && autoscrollBox.checked;
 	const videoMode = readVideoMode();
+	const { preset, formats } = readPreset();
 	setButtons({ downloading: true });
 	setStatus(autoScroll ? "expanding thread…" : "scraping visible tweets…");
 	try {
 		await withTimeout(
 			chrome.runtime.sendMessage(
-				createMessage(MESSAGE_TYPES.SCRAPE_START, { autoScroll, videoMode }),
+				createMessage(MESSAGE_TYPES.SCRAPE_START, {
+					autoScroll,
+					videoMode,
+					preset,
+					formats,
+				}),
 			),
 			10_000,
 		);
@@ -122,6 +145,22 @@ async function downloadNetworkLog() {
 			? `not reachable: ${error.message}`
 			: "download failed";
 	}
+}
+
+/**
+ * @returns {{ preset: string, formats: string[] }}
+ */
+function readPreset() {
+	const preset =
+		presetBox instanceof HTMLSelectElement ? presetBox.value : "llm";
+	if (preset !== "custom") {
+		return { preset, formats: [] };
+	}
+	const formats = PRESET_FORMATS.filter((name) => {
+		const box = document.querySelector(`#fmt-${name.split(".")[1]}`);
+		return box instanceof HTMLInputElement && box.checked;
+	});
+	return { preset, formats };
 }
 
 /**

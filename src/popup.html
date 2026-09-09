@@ -2,24 +2,56 @@
 <html lang="id">
 	<head>
 		<meta charset="utf-8" />
-		<title>X Thread Downloader</title>
+		<title>Arsip</title>
 		<link rel="stylesheet" href="./popup.css" />
 	</head>
 	<body>
-		<h3>X Thread Downloader</h3>
+		<h3>Arsip</h3>
 		<button id="ping" type="button">Check connection</button>
 		<label class="check"
 			><input id="autoscroll" type="checkbox" /> Auto-expand replies</label
 		>
+		<label class="row" for="preset">Export preset</label>
+		<select id="preset">
+			<option value="llm" selected>Buat LLM (HTML + teks)</option>
+			<option value="data">Data (JSON + CSV + Excel)</option>
+			<option value="custom">Custom…</option>
+		</select>
+		<fieldset id="custom-formats" hidden>
+			<legend>Formats</legend>
+			<label class="check"
+				><input id="fmt-html" type="checkbox" value="thread.html" checked />
+				HTML</label
+			>
+			<label class="check"
+				><input id="fmt-md" type="checkbox" value="thread.md" checked />
+				Markdown</label
+			>
+			<label class="check"
+				><input id="fmt-json" type="checkbox" value="thread.json" checked />
+				JSON</label
+			>
+			<label class="check"
+				><input id="fmt-csv" type="checkbox" value="thread.csv" checked />
+				CSV</label
+			>
+			<label class="check"
+				><input id="fmt-xlsx" type="checkbox" value="thread.xlsx" checked />
+				Excel</label
+			>
+		</fieldset>
 		<label class="row" for="videomode">Video files</label>
 		<select id="videomode">
 			<option value="bundle">Bundle into ZIP</option>
 			<option value="separate" selected>Download separately</option>
 			<option value="posters-only">Posters only</option>
 		</select>
-		<button id="download" type="button">Download JSON</button>
+		<button id="download" type="button">Download thread</button>
 		<button id="cancel" type="button" disabled>Cancel</button>
-		<button id="netlog" type="button">Download network log</button>
+		<details id="advanced">
+			<summary>Advanced</summary>
+			<button id="netlog" type="button">Download network log</button>
+		</details>
 		<p id="status" role="status" aria-live="polite">
 			Opens a thread on X, then download.
 		</p>

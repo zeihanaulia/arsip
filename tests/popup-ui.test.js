@@ -83,7 +83,7 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		});
 		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
 
-		assert.equal(await page.textContent("h3"), "X Thread Downloader");
+		assert.equal(await page.textContent("h3"), "Arsip");
 		assert.equal(await page.isDisabled("#cancel"), true);
 		const modes = await page.$eval("#videomode", (select) =>
 			[.../** @type {HTMLSelectElement} */ (select).options].map(
@@ -144,6 +144,9 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		});
 		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
 
+		await page.evaluate(() => {
+			document.querySelector("#advanced")?.setAttribute("open", "");
+		});
 		await page.click("#netlog");
 		await page.waitForFunction(
 			() =>
@@ -155,6 +158,96 @@ describe("popup UI (stubbed chrome APIs)", () => {
 
 		const status = await page.textContent("#status");
 		assert.match(status ?? "", /4 entries/);
+		assert.deepEqual(problems, []);
+	});
+
+	it("sends the selected preset with custom formats", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			/** @type {unknown[]} */
+			const sent = [];
+		});
+		await page.addInitScript(() => {
+			/** @type {unknown[]} */
+			const sent = [];
+			Object.assign(globalThis, {
+				__sent: sent,
+				chrome: {
+					tabs: { query: async () => [] },
+					runtime: {
+						sendMessage: async (/** @type {unknown} */ message) => {
+							sent.push(message);
+							const type = /** @type {{ type?: string }} */ (message)?.type;
+							if (type === "SCRAPE_STATUS") {
+								return {
+									type: "SCRAPE_PROGRESS",
+									payload: {
+										phase: "done",
+										result: {
+											type: "SCRAPE_DONE",
+											payload: { filename: "x.zip", count: 1 },
+										},
+									},
+								};
+							}
+							return {
+								type: "SCRAPE_PROGRESS",
+								payload: { phase: "started" },
+							};
+						},
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		assert.equal(
+			await page.$eval(
+				"#preset",
+				(select) => /** @type {HTMLSelectElement} */ (select).value,
+			),
+			"llm",
+		);
+		await page.selectOption("#preset", "custom");
+		await page.uncheck("#fmt-html");
+		await page.uncheck("#fmt-json");
+		await page.uncheck("#fmt-xlsx");
+		await page.click("#download");
+		await page.waitForFunction(
+			() => document.querySelector("#status")?.textContent?.includes("x.zip"),
+			{ timeout: 15_000 },
+		);
+
+		const sent = await page.evaluate(
+			() =>
+				/** @type {unknown[]} */ (
+					/** @type {{ __sent?: unknown }} */ (globalThis).__sent ?? []
+				),
+		);
+		const started = sent.find(
+			(message) =>
+				/** @type {{ type?: string }} */ (message)?.type === "SCRAPE_START",
+		);
+		assert.deepEqual(/** @type {{ payload?: unknown }} */ (started)?.payload, {
+			autoScroll: false,
+			videoMode: "separate",
+			preset: "custom",
+			formats: ["thread.md", "thread.csv"],
+		});
 		assert.deepEqual(problems, []);
 	});
 });

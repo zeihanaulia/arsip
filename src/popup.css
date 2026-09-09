@@ -50,6 +50,29 @@ select {
 	font-size: 13px;
 }
 
+fieldset {
+	margin: 8px 0 0;
+	padding: 8px 12px 12px;
+	font-size: 13px;
+}
+
+fieldset label.check {
+	margin-top: 8px;
+}
+
+details {
+	margin-top: 12px;
+	font-size: 13px;
+}
+
+details summary {
+	cursor: pointer;
+}
+
+details button {
+	margin-top: 8px;
+}
+
 input[type="checkbox"] {
 	width: 16px;
 	height: 16px;

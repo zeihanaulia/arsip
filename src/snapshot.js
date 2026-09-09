@@ -334,6 +334,60 @@ export function textToDataUrl(text, mime) {
 }
 
 /**
+ * Filters a ZIP file list by export preset. Manifest, media, and the
+ * errors file always ride along — presets only choose text formats.
+ *
+ * @template {{ name: string }} T
+ * @param {T[]} files
+ * @param {string} preset "llm" | "data" | "custom" (unknown → everything).
+ * @param {string[]} [custom] Checked file names for the custom preset.
+ * @returns {T[]}
+ */
+export function filterFilesByPreset(files, preset, custom = []) {
+	const textFormats = new Set([
+		"thread.html",
+		"thread.md",
+		"thread.json",
+		"thread.csv",
+		"thread.xlsx",
+	]);
+	const llm = new Set(["thread.html", "thread.md"]);
+	const data = new Set(["thread.json", "thread.csv", "thread.xlsx"]);
+	const wanted =
+		preset === "llm"
+			? llm
+			: preset === "data"
+				? data
+				: preset === "custom"
+					? new Set(custom)
+					: null;
+	return (files ?? []).filter(
+		(file) => !textFormats.has(file.name) || !wanted || wanted.has(file.name),
+	);
+}
+
+/**
+ * Builds errors.json from manifest items that never resolved, or null
+ * when everything made it. Partial failure stays downloadable.
+ *
+ * @param {{ url: string, type?: string, unresolved?: string }[]} items
+ * @returns {{ name: string, text: string } | null}
+ */
+export function buildErrorsFile(items) {
+	const unresolved = (items ?? [])
+		.filter((item) => typeof item?.unresolved === "string")
+		.map((item) => ({
+			url: item.url,
+			type: item.type ?? "unknown",
+			reason: item.unresolved,
+		}));
+	if (unresolved.length === 0) {
+		return null;
+	}
+	return { name: "errors.json", text: JSON.stringify({ unresolved }, null, 2) };
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */
