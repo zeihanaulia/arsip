@@ -210,11 +210,13 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);
 	const rootCaptured = isRootCaptured(snapshot);
+	const apiBodies = Array.isArray(payload.api) ? payload.api : [];
 	snapshot.capture = captureStats(lastProgress, {
 		autoScroll,
 		videoMode,
 		rootCaptured,
 		caps: payload.caps,
+		apiBodies: apiBodies.length,
 	});
 	const archiveFilename = archiveFilenameForSnapshot(snapshot);
 	const separateDir = separateDirForArchive(archiveFilename);
