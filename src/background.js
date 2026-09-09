@@ -27,6 +27,7 @@ import {
 	textToDataUrl,
 	validateSnapshot,
 } from "./snapshot.js";
+import { extractRawTweets, mergeApiIntoSnapshot } from "./x-graphql.js";
 
 /** @type {Record<string, unknown>} */
 let lastProgress = { phase: "idle", tweets: 0, batches: 0 };
@@ -193,7 +194,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		});
 	}
 	const payload =
-		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[], scrollerMissing?: unknown, caps?: unknown }} */ (
+		/** @type {{ tweets?: unknown[], sourceUrl?: string, media?: unknown[], scrollerMissing?: unknown, caps?: unknown, api?: unknown }} */ (
 			reply.payload
 		);
 	const sourceUrl =
@@ -205,6 +206,7 @@ async function scrapeAndDownload(autoScroll, videoMode) {
 		sourceUrl,
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
+	mergeCapturedApi(snapshot, payload.api);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);
 	const rootCaptured = isRootCaptured(snapshot);
@@ -307,6 +309,30 @@ async function downloadSeparateVideos(separateMedia, separateDir) {
 		}
 	}
 	return ok;
+}
+
+/**
+ * Parses captured timeline API bodies and merges tweet truth into the
+ * DOM snapshot. Unparseable bodies are skipped — the DOM result stands
+ * on its own, API is strictly an upgrade path.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot Mutated in place.
+ * @param {unknown} raw
+ */
+function mergeCapturedApi(snapshot, raw) {
+	if (!Array.isArray(raw)) {
+		return;
+	}
+	for (const body of raw.slice(0, 5)) {
+		if (typeof body !== "string" || body === "") {
+			continue;
+		}
+		try {
+			mergeApiIntoSnapshot(snapshot, extractRawTweets(JSON.parse(body)));
+		} catch {
+			// Corrupt captures must not kill a good DOM snapshot.
+		}
+	}
 }
 
 /**

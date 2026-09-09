@@ -1,0 +1,559 @@
+{
+	"data": {
+		"threaded_conversation_with_injections_v2": {
+			"instructions": [
+				{
+					"entries": [
+						{
+							"content": {
+								"__typename": "TimelineTimelineItem",
+								"clientEventInfo": { "component": "tweet", "element": "tweet" },
+								"entryType": "TimelineTimelineItem",
+								"itemContent": {
+									"__typename": "TimelineTweet",
+									"itemType": "TimelineTweet",
+									"tweetDisplayType": "Tweet",
+									"tweet_results": {
+										"result": {
+											"__typename": "Tweet",
+											"cashtag_attachments": [],
+											"core": {
+												"user_results": {
+													"result": {
+														"__typename": "User",
+														"action_counts": { "favorites_count": 379717 },
+														"affiliates_highlighted_label": {},
+														"avatar": {
+															"image_url": "https://pbs.twimg.com/profile_images/1909353910130950147/EeSGdgA5_normal.jpg"
+														},
+														"banner": {
+															"image_url": "https://pbs.twimg.com/profile_banners/786375418685165568/1777524726"
+														},
+														"core": {
+															"created_at": "Thu Oct 13 01:18:04 +0000 2016",
+															"name": "Theo - t3.gg",
+															"screen_name": "theo"
+														},
+														"follow_request_sent": false,
+														"has_graduated_access": true,
+														"id": "VXNlcjo3ODYzNzU0MTg2ODUxNjU1Njg=",
+														"is_blue_verified": true,
+														"location": { "location": "San Francisco, CA" },
+														"media_permissions": { "can_media_tag": true },
+														"notifications_settings": {
+															"notifications_enabled": false
+														},
+														"parody_commentary_fan_label": "None",
+														"pinned_items": {
+															"tweet_ids_str": ["2096854674938941448"]
+														},
+														"possibly_sensitive": false,
+														"privacy": { "protected": false },
+														"professional": {
+															"category": [],
+															"professional_type": "Creator",
+															"rest_id": "1476000433483046915"
+														},
+														"profile_bio": {
+															"description": "Full time CEO @t3dotcodes & @t3dotchat. Part time YouTuber, investor, and developer",
+															"entities": {
+																"description": {},
+																"url": {
+																	"urls": [
+																		{
+																			"display_url": "t3.gg",
+																			"expanded_url": "https://t3.gg",
+																			"indices": [0, 23],
+																			"url": "https://t.co/RIvNYtJp61"
+																		}
+																	]
+																}
+															}
+														},
+														"profile_description_language": "en",
+														"profile_image_shape": "Circle",
+														"profile_metadata": {
+															"profile_interstitial_type": ""
+														},
+														"profile_translation": {
+															"translator_type": "none"
+														},
+														"relationship_counts": {
+															"followers": 387449,
+															"following": 4228
+														},
+														"relationship_perspectives": {
+															"blocked_by": false,
+															"blocking": false,
+															"followed_by": false,
+															"following": true,
+															"live_following": false,
+															"muting": false
+														},
+														"rest_id": "786375418685165568",
+														"super_follow_eligible": true,
+														"super_followed_by": false,
+														"super_following": false,
+														"tweet_counts": {
+															"media_tweets": 9074,
+															"tweets": 66559
+														},
+														"verification": { "verified": false },
+														"website": { "url": "https://t.co/RIvNYtJp61" }
+													}
+												}
+											},
+											"edit_control": {
+												"edit_tweet_ids": ["2096854674938941448"],
+												"editable_until_msecs": "1788767686000",
+												"edits_remaining": "5",
+												"is_edit_eligible": true
+											},
+											"grok_analysis_button": true,
+											"grok_annotations": { "is_image_editable_by_grok": true },
+											"grok_translated_post_with_availability": {
+												"is_available": false
+											},
+											"has_birdwatch_notes": false,
+											"is_translatable": false,
+											"legacy": {
+												"bookmark_count": 2036,
+												"bookmarked": false,
+												"conversation_id_str": "2096854674938941448",
+												"created_at": "Mon Sep 07 06:54:46 +0000 2026",
+												"display_text_range": [0, 135],
+												"entities": {
+													"media": [
+														{
+															"additional_media_info": { "monetizable": false },
+															"allow_download_status": {
+																"allow_download": true
+															},
+															"display_url": "pic.x.com/EjMThD69bi",
+															"expanded_url": "https://x.com/theo/status/2096854674938941448/video/1",
+															"ext_media_availability": {
+																"status": "Available"
+															},
+															"id_str": "2096853248754016256",
+															"indices": [136, 159],
+															"media_key": "13_2096853248754016256",
+															"media_results": {
+																"result": {
+																	"media_key": "13_2096853248754016256"
+																}
+															},
+															"media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2096853248754016256/img/oadTg8Y6i25lhlZc.jpg",
+															"original_info": {
+																"focus_rects": [],
+																"height": 2160,
+																"width": 3840
+															},
+															"sizes": {
+																"large": {
+																	"h": 1152,
+																	"resize": "fit",
+																	"w": 2048
+																},
+																"medium": {
+																	"h": 675,
+																	"resize": "fit",
+																	"w": 1200
+																},
+																"small": {
+																	"h": 383,
+																	"resize": "fit",
+																	"w": 680
+																},
+																"thumb": {
+																	"h": 150,
+																	"resize": "crop",
+																	"w": 150
+																}
+															},
+															"type": "video",
+															"url": "https://t.co/EjMThD69bi",
+															"video_info": {
+																"aspect_ratio": [16, 9],
+																"duration_millis": 1715814,
+																"variants": [
+																	{
+																		"content_type": "application/x-mpegURL",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/pl/_rEzOT6sLDOSxJIt.m3u8?tag=29&v=269"
+																	},
+																	{
+																		"bitrate": 256000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/480x270/vY9st9ZFg6FEn4ZZ.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 832000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/640x360/KOJj6Dakx7V976nX.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 2176000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/1280x720/ezsNG9DlRUtmZpBC.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 10368000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/1920x1080/GKK662ETpdG8cbXc.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 25128000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/3840x2160/rgyso2gRHIVXXlAA.mp4?tag=29"
+																	}
+																]
+															}
+														}
+													]
+												},
+												"extended_entities": {
+													"media": [
+														{
+															"additional_media_info": { "monetizable": false },
+															"allow_download_status": {
+																"allow_download": true
+															},
+															"display_url": "pic.x.com/EjMThD69bi",
+															"expanded_url": "https://x.com/theo/status/2096854674938941448/video/1",
+															"ext_media_availability": {
+																"status": "Available"
+															},
+															"id_str": "2096853248754016256",
+															"indices": [136, 159],
+															"media_key": "13_2096853248754016256",
+															"media_results": {
+																"result": {
+																	"media_key": "13_2096853248754016256"
+																}
+															},
+															"media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2096853248754016256/img/oadTg8Y6i25lhlZc.jpg",
+															"original_info": {
+																"focus_rects": [],
+																"height": 2160,
+																"width": 3840
+															},
+															"sizes": {
+																"large": {
+																	"h": 1152,
+																	"resize": "fit",
+																	"w": 2048
+																},
+																"medium": {
+																	"h": 675,
+																	"resize": "fit",
+																	"w": 1200
+																},
+																"small": {
+																	"h": 383,
+																	"resize": "fit",
+																	"w": 680
+																},
+																"thumb": {
+																	"h": 150,
+																	"resize": "crop",
+																	"w": 150
+																}
+															},
+															"type": "video",
+															"url": "https://t.co/EjMThD69bi",
+															"video_info": {
+																"aspect_ratio": [16, 9],
+																"duration_millis": 1715814,
+																"variants": [
+																	{
+																		"content_type": "application/x-mpegURL",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/pl/_rEzOT6sLDOSxJIt.m3u8?tag=29&v=269"
+																	},
+																	{
+																		"bitrate": 256000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/480x270/vY9st9ZFg6FEn4ZZ.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 832000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/640x360/KOJj6Dakx7V976nX.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 2176000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/1280x720/ezsNG9DlRUtmZpBC.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 10368000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/1920x1080/GKK662ETpdG8cbXc.mp4?tag=29"
+																	},
+																	{
+																		"bitrate": 25128000,
+																		"content_type": "video/mp4",
+																		"url": "https://video.twimg.com/amplify_video/2096853248754016256/vid/avc1/3840x2160/rgyso2gRHIVXXlAA.mp4?tag=29"
+																	}
+																]
+															}
+														}
+													]
+												},
+												"favorite_count": 3580,
+												"favorited": false,
+												"full_text": "If you understand your whole codebase, the codebase isn't that important.\n\nReal software is larger than what your brain can comprehend. https://t.co/EjMThD69bi",
+												"id_str": "2096854674938941448",
+												"is_quote_status": false,
+												"lang": "en",
+												"possibly_sensitive": false,
+												"possibly_sensitive_editable": true,
+												"quote_count": 410,
+												"reply_count": 529,
+												"retweet_count": 178,
+												"retweeted": false,
+												"user_id_str": "786375418685165568"
+											},
+											"quick_promote_eligibility": {
+												"eligibility": "IneligibleNotVerified"
+											},
+											"rest_id": "2096854674938941448",
+											"source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+											"unmention_data": {},
+											"views": {
+												"count": "2580704",
+												"state": "EnabledWithCount"
+											}
+										}
+									}
+								}
+							},
+							"entryId": "tweet-2096854674938941448",
+							"sortIndex": "2097588994903638016"
+						},
+						{
+							"content": {
+								"__typename": "TimelineTimelineModule",
+								"clientEventInfo": {
+									"component": "tweet",
+									"details": {
+										"conversationDetails": {
+											"conversationSection": "HighQuality"
+										},
+										"timelinesDetails": {
+											"controllerData": "DAACDAAEDAABCgABAAAAAAAAAAEKAAIAAAAAAAAAAAoAAwAAAaCFFVL1AAAAAA=="
+										}
+									}
+								},
+								"displayType": "VerticalConversation",
+								"entryType": "TimelineTimelineModule",
+								"items": [
+									{
+										"entryId": "conversationthread-2097417692647186780-tweet-2097417692647186780",
+										"item": {
+											"clientEventInfo": {
+												"component": "tweet",
+												"details": {
+													"conversationDetails": {
+														"conversationSection": "HighQuality"
+													},
+													"timelinesDetails": {
+														"controllerData": "DAACDAAEDAABCgABAAAAAAAAAAEKAAIAAAAAAAAAAAoAAwAAAaCFFVL1AAAAAA=="
+													}
+												},
+												"element": "tweet"
+											},
+											"itemContent": {
+												"__typename": "TimelineTweet",
+												"itemType": "TimelineTweet",
+												"tweetDisplayType": "Tweet",
+												"tweet_results": {
+													"result": {
+														"__typename": "Tweet",
+														"cashtag_attachments": [],
+														"core": {
+															"user_results": {
+																"result": {
+																	"__typename": "User",
+																	"action_counts": { "favorites_count": 74696 },
+																	"affiliates_highlighted_label": {},
+																	"avatar": {
+																		"image_url": "https://pbs.twimg.com/profile_images/1613151603564986368/dZoNeRKn_normal.jpg"
+																	},
+																	"banner": {
+																		"image_url": "https://pbs.twimg.com/profile_banners/1014187652340441088/1758928732"
+																	},
+																	"core": {
+																		"created_at": "Tue Jul 03 16:42:33 +0000 2018",
+																		"name": "teej dv 🔭",
+																		"screen_name": "teej_dv"
+																	},
+																	"follow_request_sent": false,
+																	"has_graduated_access": true,
+																	"id": "VXNlcjoxMDE0MTg3NjUyMzQwNDQxMDg4",
+																	"is_blue_verified": true,
+																	"location": { "location": "the terminal" },
+																	"media_permissions": {
+																		"can_media_tag": true
+																	},
+																	"notifications_settings": {
+																		"notifications_enabled": false
+																	},
+																	"parody_commentary_fan_label": "None",
+																	"pinned_items": {
+																		"tweet_ids_str": ["2090795638724190458"]
+																	},
+																	"possibly_sensitive": false,
+																	"privacy": { "protected": false },
+																	"professional": {
+																		"category": [
+																			{
+																				"icon_name": "IconBriefcaseStroke",
+																				"id": 713,
+																				"name": "Science & Technology"
+																			}
+																		],
+																		"professional_type": "Creator",
+																		"rest_id": "1606344628407603211"
+																	},
+																	"profile_bio": {
+																		"description": "open source code | @neovim core | @terminaldotshop btw | ✝️\n\nfather of 3, dad jokes my own\n\nhttps://t.co/jKpcjsTqBE |  https://t.co/zb8zDKmSwG",
+																		"entities": {
+																			"description": {
+																				"urls": [
+																					{
+																						"display_url": "twitch.tv/teej_dv",
+																						"expanded_url": "http://twitch.tv/teej_dv",
+																						"indices": [92, 115],
+																						"url": "https://t.co/jKpcjsTqBE"
+																					},
+																					{
+																						"display_url": "youtube.com/@teej_dv",
+																						"expanded_url": "http://youtube.com/@teej_dv",
+																						"indices": [119, 142],
+																						"url": "https://t.co/zb8zDKmSwG"
+																					}
+																				]
+																			},
+																			"url": {
+																				"urls": [
+																					{
+																						"display_url": "teej.tv",
+																						"expanded_url": "http://teej.tv",
+																						"indices": [0, 23],
+																						"url": "https://t.co/hPfIwhBMpu"
+																					}
+																				]
+																			}
+																		}
+																	},
+																	"profile_description_language": "en",
+																	"profile_image_shape": "Circle",
+																	"profile_metadata": {
+																		"profile_interstitial_type": ""
+																	},
+																	"profile_translation": {
+																		"translator_type": "none"
+																	},
+																	"relationship_counts": {
+																		"followers": 89617,
+																		"following": 1474
+																	},
+																	"relationship_perspectives": {
+																		"blocked_by": false,
+																		"blocking": false,
+																		"followed_by": false,
+																		"following": true,
+																		"live_following": false,
+																		"muting": false
+																	},
+																	"rest_id": "1014187652340441088",
+																	"super_follow_eligible": true,
+																	"super_followed_by": false,
+																	"super_following": false,
+																	"tweet_counts": {
+																		"media_tweets": 1853,
+																		"tweets": 24473
+																	},
+																	"verification": { "verified": false },
+																	"website": {
+																		"url": "https://t.co/hPfIwhBMpu"
+																	}
+																}
+															}
+														},
+														"edit_control": {
+															"edit_tweet_ids": ["2097417692647186780"],
+															"editable_until_msecs": "1788901920000",
+															"edits_remaining": "5",
+															"is_edit_eligible": false
+														},
+														"grok_analysis_button": true,
+														"grok_annotations": {},
+														"grok_translated_post_with_availability": {
+															"is_available": false
+														},
+														"has_birdwatch_notes": false,
+														"is_translatable": false,
+														"legacy": {
+															"bookmark_count": 0,
+															"bookmarked": false,
+															"conversation_id_str": "2096854674938941448",
+															"created_at": "Tue Sep 08 20:12:00 +0000 2026",
+															"display_text_range": [6, 52],
+															"entities": {
+																"user_mentions": [
+																	{
+																		"id_str": "786375418685165568",
+																		"indices": [0, 5],
+																		"name": "Theo - t3.gg",
+																		"screen_name": "theo"
+																	}
+																]
+															},
+															"favorite_count": 79,
+															"favorited": false,
+															"full_text": "@theo What if I don't understand any of my codebase?",
+															"id_str": "2097417692647186780",
+															"in_reply_to_screen_name": "theo",
+															"in_reply_to_status_id_str": "2096854674938941448",
+															"in_reply_to_user_id_str": "786375418685165568",
+															"is_quote_status": false,
+															"lang": "en",
+															"quote_count": 0,
+															"reply_count": 10,
+															"retweet_count": 0,
+															"retweeted": false,
+															"user_id_str": "1014187652340441088"
+														},
+														"quick_promote_eligibility": {
+															"eligibility": "IneligibleNotVerified"
+														},
+														"rest_id": "2097417692647186780",
+														"source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+														"unmention_data": {},
+														"views": {
+															"count": "3095",
+															"state": "EnabledWithCount"
+														}
+													}
+												}
+											}
+										}
+									}
+								],
+								"metadata": {
+									"conversationMetadata": {
+										"allTweetIds": ["2097418534313934917"],
+										"enableDeduplication": true
+									}
+								}
+							},
+							"entryId": "conversationthread-2097417692647186780",
+							"sortIndex": "2097588994903638006"
+						}
+					],
+					"type": "TimelineAddEntries"
+				}
+			]
+		}
+	}
+}

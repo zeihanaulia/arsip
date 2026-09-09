@@ -176,8 +176,37 @@ async function runScrape(autoScroll, videoMode) {
 		sourceUrl: scraped.payload.sourceUrl ?? "",
 		scrollerMissing,
 		caps: capabilities(),
+		api: timelineApiBodies(),
 		media: await downloadThreadMedia(tweets, videoMode),
 	});
+}
+
+/**
+ * Bodies of captured timeline API responses (TweetDetail and siblings),
+ * newest first, capped so the message channel survives. The background
+ * parses them; unparseable bodies are skipped there, never here.
+ *
+ * @returns {string[]}
+ */
+function timelineApiBodies() {
+	const bodies = [];
+	for (let index = netLog.length - 1; index >= 0; index -= 1) {
+		const entry = netLog[index];
+		if (
+			typeof entry.url === "string" &&
+			/TweetDetail|TweetResultByRestId|HomeTimeline|SearchTimeline/.test(
+				entry.url,
+			) &&
+			typeof entry.body === "string" &&
+			entry.body !== ""
+		) {
+			bodies.push(entry.body);
+		}
+		if (bodies.length >= 5) {
+			break;
+		}
+	}
+	return bodies;
 }
 
 /**
