@@ -27,15 +27,25 @@ const PRESET_FORMATS = [
 /** @type {boolean} */
 let polling = false;
 
+const UNSUPPORTED_SITE_MESSAGE =
+	"Arsip V1 hanya mendukung thread X — dukungan situs lain nyusul.";
+
 pingButton?.addEventListener("click", async () => {
+	if (!(await activeThreadTab())) {
+		setStatus(UNSUPPORTED_SITE_MESSAGE);
+		return;
+	}
 	setStatus("checking…");
 	setStatus(await pingContentScript());
 });
 
 downloadButton?.addEventListener("click", async () => {
+	if (!(await activeThreadTab())) {
+		setStatus(UNSUPPORTED_SITE_MESSAGE);
+		return;
+	}
 	await downloadVisibleThread();
 });
-
 presetBox?.addEventListener("change", () => {
 	if (customFormats instanceof HTMLFieldSetElement) {
 		customFormats.hidden =
@@ -44,6 +54,10 @@ presetBox?.addEventListener("change", () => {
 });
 
 netlogButton?.addEventListener("click", async () => {
+	if (!(await activeThreadTab())) {
+		setStatus(UNSUPPORTED_SITE_MESSAGE);
+		return;
+	}
 	setStatus("fetching network log…");
 	setStatus(await downloadNetworkLog());
 });
@@ -60,6 +74,32 @@ cancelButton?.addEventListener("click", async () => {
 	setStatus("cancelled — a partial file may still download.");
 	setButtons({ downloading: false });
 });
+
+/**
+ * The active tab only when it is an X thread page (the only pages our
+ * content scripts are injected into). Anything else is refused up front
+ * with an explicit message instead of a confusing channel error.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function activeThreadTab() {
+	try {
+		const [tab] = await chrome.tabs.query({
+			active: true,
+			currentWindow: true,
+		});
+		const host = new URL(tab?.url ?? "").hostname.toLowerCase();
+		return (
+			tab?.id !== undefined &&
+			(host === "x.com" ||
+				host.endsWith(".x.com") ||
+				host === "twitter.com" ||
+				host.endsWith(".twitter.com"))
+		);
+	} catch {
+		return false;
+	}
+}
 
 /**
  * @param {string} text

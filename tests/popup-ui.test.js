@@ -29,7 +29,7 @@ describe("popup UI (stubbed chrome APIs)", () => {
 			let polls = 0;
 			const chromeStub = {
 				tabs: {
-					query: async () => [{ id: 7 }],
+					query: async () => [{ id: 7, url: "https://x.com/a/status/1" }],
 					sendMessage: async () => ({
 						type: "PING",
 						payload: { connected: true },
@@ -139,7 +139,9 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		await page.addInitScript(() => {
 			Object.assign(globalThis, {
 				chrome: {
-					tabs: { query: async () => [] },
+					tabs: {
+						query: async () => [{ id: 7, url: "https://x.com/a/status/1" }],
+					},
 					runtime: {
 						sendMessage: async () => ({
 							type: "SCRAPE_DONE",
@@ -168,6 +170,54 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		assert.deepEqual(problems, []);
 	});
 
+	it("refuses non-X sites with an explicit message instead of a channel error", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			Object.assign(globalThis, {
+				chrome: {
+					tabs: {
+						query: async () => [
+							{ id: 9, url: "https://learning.oreilly.com/library/view/x" },
+						],
+					},
+					runtime: {
+						sendMessage: async () => {
+							throw new Error("must never send on unsupported sites");
+						},
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.click("#download");
+		await page.waitForFunction(
+			() =>
+				document
+					.querySelector("#status")
+					?.textContent?.includes("hanya mendukung"),
+			{ timeout: 15_000 },
+		);
+
+		const status = await page.textContent("#status");
+		assert.match(status ?? "", /hanya mendukung/);
+		assert.deepEqual(problems, []);
+	});
+
 	it("sends the selected preset with custom formats", async (t) => {
 		const browser = await chromium.launch({
 			headless: !headed,
@@ -190,7 +240,9 @@ describe("popup UI (stubbed chrome APIs)", () => {
 			Object.assign(globalThis, {
 				__sent: sent,
 				chrome: {
-					tabs: { query: async () => [] },
+					tabs: {
+						query: async () => [{ id: 7, url: "https://x.com/a/status/1" }],
+					},
 					runtime: {
 						sendMessage: async (/** @type {unknown} */ message) => {
 							sent.push(message);
