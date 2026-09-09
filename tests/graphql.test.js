@@ -110,12 +110,13 @@ describe("mergeApiIntoSnapshot", () => {
 
 		const merged = mergeApiIntoSnapshot(snapshot, extractRawTweets(payload));
 
-		assert.equal(merged.tweets.length, 2);
+		assert.equal(merged.tweets.length, 3);
 		const root = merged.tweets[0];
 		assert.equal(root.metrics.likes, 3580);
 		assert.equal(root.user.name, "Theo - t3.gg");
 		assert.ok(root.media.some((item) => item.type === "video"));
 		assert.equal(merged.tweets[1].id, "999");
+		assert.equal(merged.tweets[2].id, "2097417692647186780");
 	});
 
 	it("leaves the snapshot untouched when the API has nothing new", () => {
@@ -124,5 +125,45 @@ describe("mergeApiIntoSnapshot", () => {
 		});
 
 		assert.deepEqual(mergeApiIntoSnapshot(snapshot, []).tweets, []);
+	});
+
+	it("appends API-only tweets instead of dropping them", () => {
+		const snapshot = assembleSnapshot(
+			[
+				{
+					id: "2096854674938941448",
+					text: "root",
+					url: "https://x.com/theo/status/2096854674938941448",
+				},
+			],
+			"https://x.com/theo/status/2096854674938941448",
+		);
+
+		const merged = mergeApiIntoSnapshot(snapshot, extractRawTweets(payload));
+
+		const reply = merged.tweets.find((t) => t.id === "2097417692647186780");
+		assert.ok(reply, "API-only reply appended");
+		assert.equal(reply.replyTo, "2096854674938941448");
+		assert.equal(reply.inferred, false);
+		assert.equal(reply.metrics.likes, 79);
+	});
+
+	it("dedups the same API tweet across bodies", () => {
+		const snapshot = assembleSnapshot(
+			[
+				{
+					id: "2096854674938941448",
+					text: "root",
+					url: "https://x.com/theo/status/2096854674938941448",
+				},
+			],
+			"https://x.com/theo/status/2096854674938941448",
+		);
+		const api = extractRawTweets(payload);
+
+		const merged = mergeApiIntoSnapshot(snapshot, [...api, ...api]);
+
+		const ids = merged.tweets.map((t) => t.id);
+		assert.equal(ids.length, new Set(ids).size);
 	});
 });

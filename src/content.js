@@ -163,9 +163,13 @@ function postProgress(stats) {
 async function runScrape(autoScroll, videoMode) {
 	cancelRequested = false;
 	const scroller = readScroller();
+	const collected = new Map();
+	accumulateBatch(collected);
 	let scrollerMissing = false;
 	if (autoScroll) {
-		scrollerMissing = await expandThread(scroller);
+		scrollerMissing = await expandThread(scroller, () =>
+			accumulateBatch(collected),
+		);
 	}
 	if (scroller && typeof scroller.mountLazyMedia === "function") {
 		postProgress({ phase: "mounting" });
@@ -175,7 +179,11 @@ async function runScrape(autoScroll, videoMode) {
 	if (scraped.type !== MESSAGE_TYPES.SCRAPE_DONE) {
 		return scraped;
 	}
-	const tweets = /** @type {unknown[]} */ (scraped.payload.tweets ?? []);
+	accumulateBatch(collected);
+	const tweets =
+		collected.size > 0
+			? [...collected.values()]
+			: /** @type {unknown[]} */ (scraped.payload.tweets ?? []);
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
@@ -184,6 +192,34 @@ async function runScrape(autoScroll, videoMode) {
 		api: timelineApiBodies(),
 		media: await downloadThreadMedia(tweets, videoMode),
 	});
+}
+
+/**
+ * Unions one DOM scrape into the cross-batch collection (first sighting
+ * wins). The timeline virtualizer removes far tweets as you scroll, so
+ * the last scrape alone would silently drop everything loaded earlier.
+ *
+ * @param {Map<string, unknown>} collected
+ */
+function accumulateBatch(collected) {
+	try {
+		const adapter =
+			/** @type {{ scrapeRaw?: (doc: Document, url: string) => { tweets: unknown[] } } | undefined} */ (
+				globalThis.XAdapter
+			);
+		const batch = adapter?.scrapeRaw?.(document, "")?.tweets ?? [];
+		for (const raw of batch) {
+			if (!raw || typeof raw !== "object") {
+				continue;
+			}
+			const id = /** @type {{ id?: unknown }} */ (raw).id;
+			if (typeof id === "string" && id !== "" && !collected.has(id)) {
+				collected.set(id, raw);
+			}
+		}
+	} catch {
+		// A failed batch scrape must not kill the collected tweets.
+	}
 }
 
 /**
@@ -207,7 +243,7 @@ function timelineApiBodies() {
 		) {
 			bodies.push(entry.body);
 		}
-		if (bodies.length >= 5) {
+		if (bodies.length >= 15) {
 			break;
 		}
 	}
@@ -229,9 +265,10 @@ function readScroller() {
  * viewport scrape that always follows.
  *
  * @param {{ expandAndScroll?: (...args: unknown[]) => Promise<Record<string, unknown>> } | undefined} scroller
+ * @param {() => void} [onBatch] Runs after every scrolled batch.
  * @returns {Promise<boolean>} True when the scroller was missing entirely.
  */
-async function expandThread(scroller) {
+async function expandThread(scroller, onBatch) {
 	if (!scroller || typeof scroller.expandAndScroll !== "function") {
 		postProgress({ phase: "scraping", scrollerMissing: true });
 		return true;
@@ -240,8 +277,10 @@ async function expandThread(scroller) {
 		const stats = await scroller.expandAndScroll(
 			document,
 			{ shouldStop: () => cancelRequested },
-			(/** @type {Record<string, unknown>} */ progress) =>
-				postProgress({ phase: "expanding", ...progress }),
+			(/** @type {Record<string, unknown>} */ progress) => {
+				onBatch?.();
+				postProgress({ phase: "expanding", ...progress });
+			},
 		);
 		postProgress({ phase: "scraping", ...(stats ?? {}) });
 	} catch (error) {

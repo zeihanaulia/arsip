@@ -252,8 +252,8 @@ export function isRootCaptured(snapshot) {
  * of guessing.
  *
  * @param {Record<string, unknown>} [progress] Last scroller progress.
- * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown, apiBodies?: unknown }} [options]
- * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[], scrollTarget?: string }}
+ * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown, apiBodies?: unknown, apiAdded?: unknown }} [options]
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[], scrollTarget?: string, apiAdded?: number }}
  */
 export function captureStats(progress = {}, options = {}) {
 	const stoppedWhy =
@@ -266,15 +266,32 @@ export function captureStats(progress = {}, options = {}) {
 			? options.videoMode
 			: "bundle";
 	const result =
-		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[], scrollTarget?: string }} */ ({
+		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[], scrollTarget?: string, apiAdded?: number }} */ ({
 			stoppedWhy,
 			batches,
 			autoScroll: options.autoScroll === true,
 			videoMode,
 			rootCaptured: options.rootCaptured !== false,
 		});
-	if (typeof options.apiBodies === "number") {
-		result.apiBodies = options.apiBodies;
+	applyOptionalProvenance(result, progress, options);
+	return result;
+}
+
+/**
+ * Copies known optional provenance fields only when present with the
+ * right shape. One place defines what "optional but preserved" means,
+ * so the list can grow without raising the caller's complexity.
+ *
+ * @param {{ phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[], scrollTarget?: string, apiAdded?: number }} result Mutated in place.
+ * @param {Record<string, unknown>} progress
+ * @param {{ caps?: unknown, apiBodies?: unknown, apiAdded?: unknown }} options
+ */
+function applyOptionalProvenance(result, progress, options) {
+	if (typeof progress.phase === "string" && progress.phase !== "") {
+		result.phase = progress.phase;
+	}
+	if (typeof progress.expandError === "string" && progress.expandError !== "") {
+		result.expandError = progress.expandError;
 	}
 	if (Array.isArray(progress.history)) {
 		result.history = progress.history.filter(
@@ -287,16 +304,15 @@ export function captureStats(progress = {}, options = {}) {
 	) {
 		result.scrollTarget = progress.scrollTarget;
 	}
-	if (typeof progress.phase === "string" && progress.phase !== "") {
-		result.phase = progress.phase;
-	}
-	if (typeof progress.expandError === "string" && progress.expandError !== "") {
-		result.expandError = progress.expandError;
-	}
 	if (typeof options.caps === "object" && options.caps !== null) {
 		result.caps = /** @type {Record<string, unknown>} */ (options.caps);
 	}
-	return result;
+	if (typeof options.apiBodies === "number") {
+		result.apiBodies = options.apiBodies;
+	}
+	if (typeof options.apiAdded === "number") {
+		result.apiAdded = options.apiAdded;
+	}
 }
 
 /**

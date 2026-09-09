@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: virtualized timeline recycles old tweets</title>
+	</head>
+	<body>
+		<main id="timeline">
+			<article data-testid="tweet">
+				<div data-testid="tweetText">First tweet</div>
+				<a href="/a/status/1"
+					><time datetime="2026-09-07T18:26:02.000Z">Sep 7</time></a
+				>
+			</article>
+			<button id="more" type="button">Show more replies</button>
+		</main>
+		<script>
+			document.querySelector("#more").addEventListener("click", () => {
+				const timeline = document.querySelector("#timeline");
+				// Virtualizer behavior: the new chunk arrives, the old node
+				// leaves the DOM. A last-scrape-only snapshot loses it.
+				const extra = document.createElement("article");
+				extra.setAttribute("data-testid", "tweet");
+				extra.innerHTML =
+					'<div data-testid="tweetText">Second tweet</div>' +
+					'<a href="/a/status/2">' +
+					'<time datetime="2026-09-07T19:26:02.000Z">Sep 7</time></a>';
+				timeline.append(extra);
+				timeline.querySelector("article").remove();
+				document.querySelector("#more").remove();
+			});
+		</script>
+	</body>
+</html>

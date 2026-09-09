@@ -824,6 +824,63 @@ describe("x-adapter (real Chromium)", () => {
 		);
 	});
 
+	it("accumulates tweets across batches instead of keeping the last scrape", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-recycle.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/scroller.js") });
+		await page.addScriptTag({ path: join(root, "src/media.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const response = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener(
+					{ type: "SCRAPE_START", payload: { autoScroll: true } },
+					{},
+					resolve,
+				);
+			});
+		});
+		const payload =
+			/** @type {{ type?: string, payload?: Record<string, unknown> }} */ (
+				response
+			);
+		const ids = /** @type {{ id?: unknown }[]} */ (
+			payload.payload?.tweets ?? []
+		).map((tweet) => tweet.id);
+
+		assert.equal(payload.type, "SCRAPE_DONE");
+		assert.deepEqual(ids, ["1", "2"]);
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
