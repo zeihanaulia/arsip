@@ -112,4 +112,49 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		await page.screenshot({ path: join(tmpdir(), "xdl-popup.png") });
 		assert.deepEqual(problems, []);
 	});
+
+	it("downloads the network log on demand", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			Object.assign(globalThis, {
+				chrome: {
+					tabs: { query: async () => [] },
+					runtime: {
+						sendMessage: async () => ({
+							type: "SCRAPE_DONE",
+							payload: { filename: "network-log.json", entries: 4 },
+						}),
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.click("#netlog");
+		await page.waitForFunction(
+			() =>
+				document
+					.querySelector("#status")
+					?.textContent?.includes("network-log.json"),
+			{ timeout: 15_000 },
+		);
+
+		const status = await page.textContent("#status");
+		assert.match(status ?? "", /4 entries/);
+		assert.deepEqual(problems, []);
+	});
 });

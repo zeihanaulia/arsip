@@ -72,4 +72,18 @@ describe("manifest", () => {
 			);
 		}
 	});
+
+	it("injects the network hook in the MAIN world at document start", () => {
+		const entries =
+			/** @type {{ js?: string[], world?: string, run_at?: string }[]} */ (
+				manifest.content_scripts ?? []
+			);
+		const hook = entries.find((entry) =>
+			(entry.js ?? []).some((file) => file.includes("hook-main")),
+		);
+
+		assert.ok(hook, "hook-main entry must exist");
+		assert.equal(hook?.world, "MAIN");
+		assert.equal(hook?.run_at, "document_start");
+	});
 });

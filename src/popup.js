@@ -10,6 +10,7 @@ const downloadButton = document.querySelector("#download");
 const cancelButton = document.querySelector("#cancel");
 const autoscrollBox = document.querySelector("#autoscroll");
 const videoModeBox = document.querySelector("#videomode");
+const netlogButton = document.querySelector("#netlog");
 
 /** @type {boolean} */
 let polling = false;
@@ -21,6 +22,11 @@ pingButton?.addEventListener("click", async () => {
 
 downloadButton?.addEventListener("click", async () => {
 	await downloadVisibleThread();
+});
+
+netlogButton?.addEventListener("click", async () => {
+	setStatus("fetching network log…");
+	setStatus(await downloadNetworkLog());
 });
 
 cancelButton?.addEventListener("click", async () => {
@@ -89,6 +95,33 @@ async function downloadVisibleThread() {
 	}
 	setButtons({ downloading: false });
 	polling = false;
+}
+
+/**
+ * One-shot network log download (Task 7 slice 1): no polling, the
+ * background answers directly.
+ *
+ * @returns {Promise<string>}
+ */
+async function downloadNetworkLog() {
+	try {
+		const reply = await withTimeout(
+			chrome.runtime.sendMessage(createMessage(MESSAGE_TYPES.DUMP_NETWORK)),
+			30_000,
+		);
+		if (
+			isMessage(reply) &&
+			reply.type === MESSAGE_TYPES.SCRAPE_DONE &&
+			typeof reply.payload.filename === "string"
+		) {
+			return `downloaded ${reply.payload.filename} (${String(reply.payload.entries ?? 0)} entries)`;
+		}
+		return `failed: ${JSON.stringify(isMessage(reply) ? reply.payload : reply)}`;
+	} catch (error) {
+		return error instanceof Error
+			? `not reachable: ${error.message}`
+			: "download failed";
+	}
 }
 
 /**

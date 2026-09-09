@@ -725,6 +725,51 @@ describe("x-adapter (real Chromium)", () => {
 		]);
 	});
 
+	describe("hook-main (real Chromium)", () => {
+		it("captures stub fetch and XHR JSON without breaking them", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/hook-main.js") });
+
+			const captured = await page.evaluate(async () => {
+				/** @type {unknown[]} */
+				const seen = [];
+				window.addEventListener("arsip:net", (event) => {
+					seen.push(/** @type {CustomEvent} */ (event).detail);
+				});
+				const fetched = await (
+					await fetch('data:application/json,{"hello":"fetch"}')
+				).json();
+				const xhrText = await new Promise((resolve, reject) => {
+					const xhr = new XMLHttpRequest();
+					xhr.open("GET", 'data:application/json,{"hello":"xhr"}');
+					xhr.addEventListener("load", () => resolve(xhr.responseText));
+					xhr.addEventListener("error", reject);
+					xhr.send();
+				});
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				return { fetched, xhrText, seen };
+			});
+
+			assert.deepEqual(captured.fetched, { hello: "fetch" });
+			assert.equal(captured.xhrText, '{"hello":"xhr"}');
+			assert.equal(captured.seen.length, 2);
+			assert.ok(
+				captured.seen.every(
+					(entry) =>
+						/** @type {{ mime?: string, body?: string }} */ (entry).mime ===
+							"application/json" &&
+						typeof (/** @type {{ body?: unknown }} */ (entry).body) ===
+							"string",
+				),
+			);
+		});
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

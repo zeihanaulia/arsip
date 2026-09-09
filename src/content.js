@@ -17,6 +17,7 @@ const MESSAGE_TYPES = Object.freeze({
 	SCRAPE_STATUS: "SCRAPE_STATUS",
 	SCRAPE_CANCEL: "SCRAPE_CANCEL",
 	BUILD_ZIP: "BUILD_ZIP",
+	DUMP_NETWORK: "DUMP_NETWORK",
 	SCRAPE_DONE: "SCRAPE_DONE",
 	SCRAPE_ERROR: "SCRAPE_ERROR",
 });
@@ -66,6 +67,42 @@ function capabilities() {
 		zip: typeof globals.JSZip !== "undefined",
 		sheet: typeof globals.XLSX !== "undefined",
 	};
+}
+
+/**
+ * Network capture buffer fed by the MAIN-world hook via DOM events
+ * (event name shared with src/hook-main.js). Newest entries win when
+ * the dump would exceed the message channel budget.
+ */
+const MAX_NET_LOG_BYTES = 30_000_000;
+/** @type {Record<string, unknown>[]} */
+const netLog = [];
+
+window.addEventListener("arsip:net", (event) => {
+	const entry = /** @type {{ detail?: unknown }} */ (event).detail;
+	if (entry && typeof entry === "object") {
+		netLog.push(/** @type {Record<string, unknown>} */ (entry));
+		while (netLog.length > 500) {
+			netLog.shift();
+		}
+	}
+});
+
+/**
+ * @returns {Record<string, unknown>[]} Newest-first, within budget.
+ */
+function trimNetLog() {
+	const kept = [];
+	let bytes = 0;
+	for (let index = netLog.length - 1; index >= 0; index -= 1) {
+		const entry = netLog[index];
+		bytes += JSON.stringify(entry).length;
+		if (bytes > MAX_NET_LOG_BYTES) {
+			break;
+		}
+		kept.unshift(entry);
+	}
+	return kept;
 }
 
 /**
@@ -460,6 +497,10 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 	if (raw.type === MESSAGE_TYPES.BUILD_ZIP) {
 		buildZipReply(raw).then(respond);
 		return true;
+	}
+	if (raw.type === MESSAGE_TYPES.DUMP_NETWORK) {
+		respond(reply(MESSAGE_TYPES.SCRAPE_DONE, { log: trimNetLog() }));
+		return false;
 	}
 	respond(
 		reply(MESSAGE_TYPES.SCRAPE_ERROR, {

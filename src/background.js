@@ -24,6 +24,7 @@ import {
 	isRootCaptured,
 	separateDirForArchive,
 	splitMediaForMode,
+	textToDataUrl,
 	validateSnapshot,
 } from "./snapshot.js";
 
@@ -64,6 +65,10 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		forwardToActiveTab(raw).then(respond);
 		return true;
 	}
+	if (raw.type === MESSAGE_TYPES.DUMP_NETWORK) {
+		dumpNetworkLog().then(respond);
+		return true;
+	}
 	forwardToActiveTab(raw).then(respond);
 	return true;
 });
@@ -96,6 +101,45 @@ function readVideoMode(message) {
 		payload.videoMode === "posters-only"
 		? payload.videoMode
 		: "bundle";
+}
+
+/**
+ * Asks the tab for its captured network log and downloads it as JSON.
+ * Never rejects: answers with an error message instead.
+ *
+ * @returns {Promise<import("./messaging.js").Message>}
+ */
+async function dumpNetworkLog() {
+	try {
+		const reply = await forwardToActiveTab(
+			createMessage(MESSAGE_TYPES.DUMP_NETWORK),
+		);
+		if (
+			!isMessage(reply) ||
+			reply.type !== MESSAGE_TYPES.SCRAPE_DONE ||
+			!Array.isArray(reply.payload.log)
+		) {
+			return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+				code: "DUMP_FAILED",
+			});
+		}
+		const date = new Date().toISOString().slice(0, 10);
+		const filename = `network-log-${date}.json`;
+		const url = textToDataUrl(
+			JSON.stringify(reply.payload.log),
+			"application/json",
+		);
+		await chrome.downloads.download({ url, filename, saveAs: false });
+		return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
+			filename,
+			entries: reply.payload.log.length,
+		});
+	} catch (error) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "UNEXPECTED",
+			detail: withTabHint(error),
+		});
+	}
 }
 
 /**

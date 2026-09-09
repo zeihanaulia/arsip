@@ -286,6 +286,24 @@ export function captureStats(progress = {}, options = {}) {
 }
 
 /**
+ * Encodes text as a base64 data URL — the download vehicle available
+ * to a service worker (no URL.createObjectURL there).
+ *
+ * @param {string} text
+ * @param {string} mime
+ * @returns {string}
+ */
+export function textToDataUrl(text, mime) {
+	const bytes = new TextEncoder().encode(String(text ?? ""));
+	let binary = "";
+	const chunk = 0x8000;
+	for (let i = 0; i < bytes.length; i += chunk) {
+		binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+	}
+	return `data:${mime};base64,${btoa(binary)}`;
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Same base name as the JSON export, with a zip extension.
  */

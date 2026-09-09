@@ -22,6 +22,12 @@
 				"src/media.js",
 				"src/content.js"
 			]
+		},
+		{
+			"matches": ["https://x.com/*", "https://twitter.com/*"],
+			"js": ["src/hook-main.js"],
+			"run_at": "document_start",
+			"world": "MAIN"
 		}
 	]
 }

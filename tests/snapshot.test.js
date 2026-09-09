@@ -15,6 +15,7 @@ import {
 	separateDirForArchive,
 	snapshotToDataUrl,
 	splitMediaForMode,
+	textToDataUrl,
 } from "../src/snapshot.js";
 
 const RAW_ROOT = {
@@ -257,6 +258,15 @@ describe("captionsToText", () => {
 describe("base64ToText", () => {
 	it("decodes base64 into utf8 text", () => {
 		assert.equal(base64ToText("aGVsbG8="), "hello");
+	});
+});
+
+describe("textToDataUrl", () => {
+	it("round-trips text through the data URL", () => {
+		const url = textToDataUrl('{"a":1}', "application/json");
+
+		assert.match(url, /^data:application\/json;base64,/);
+		assert.equal(base64ToText(url.split(",")[1] ?? ""), '{"a":1}');
 	});
 });
 
