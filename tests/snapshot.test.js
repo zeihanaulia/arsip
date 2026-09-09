@@ -399,6 +399,13 @@ describe("captureStats", () => {
 		);
 	});
 
+	it("keeps the growth curve for patience diagnosis", () => {
+		assert.deepEqual(
+			captureStats({ batches: 3, history: [5, 5, 9] }, {}).history,
+			[5, 5, 9],
+		);
+	});
+
 	it("records how many API bodies rode along", () => {
 		assert.equal(captureStats({}, { apiBodies: 3 }).apiBodies, 3);
 		assert.equal("apiBodies" in captureStats({}, {}), false);

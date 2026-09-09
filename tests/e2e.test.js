@@ -833,6 +833,8 @@ describe("x-adapter (real Chromium)", () => {
 
 		assert.equal(after, 2);
 		assert.equal(stats.stoppedWhy, "idle");
+		assert.ok(stats.history.length > 0, "growth curve recorded");
+		assert.equal(stats.history[stats.history.length - 1], 2);
 	});
 
 	it("renders the exported HTML offline from local media only", async (t) => {

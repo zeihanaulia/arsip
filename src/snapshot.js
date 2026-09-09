@@ -253,7 +253,7 @@ export function isRootCaptured(snapshot) {
  *
  * @param {Record<string, unknown>} [progress] Last scroller progress.
  * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown, apiBodies?: unknown }} [options]
- * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number }}
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[] }}
  */
 export function captureStats(progress = {}, options = {}) {
 	const stoppedWhy =
@@ -266,7 +266,7 @@ export function captureStats(progress = {}, options = {}) {
 			? options.videoMode
 			: "bundle";
 	const result =
-		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number }} */ ({
+		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number, history?: number[] }} */ ({
 			stoppedWhy,
 			batches,
 			autoScroll: options.autoScroll === true,
@@ -275,6 +275,11 @@ export function captureStats(progress = {}, options = {}) {
 		});
 	if (typeof options.apiBodies === "number") {
 		result.apiBodies = options.apiBodies;
+	}
+	if (Array.isArray(progress.history)) {
+		result.history = progress.history.filter(
+			(count) => typeof count === "number",
+		);
 	}
 	if (typeof progress.phase === "string" && progress.phase !== "") {
 		result.phase = progress.phase;

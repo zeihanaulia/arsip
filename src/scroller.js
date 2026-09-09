@@ -21,6 +21,7 @@
  * @property {number} clicked Expand buttons clicked.
  * @property {number} batches Batches executed.
  * @property {number} tweets Tweets loaded when stopping.
+ * @property {number[]} history Tweet count after each batch (growth curve).
  * @property {string} stoppedWhy "idle" | "max-batches" | "max-tweets" | "cancelled".
  */
 
@@ -61,7 +62,13 @@ async function expandAndScroll(root, options = {}, onProgress) {
 		maxTweets = 300,
 		shouldStop = () => false,
 	} = options;
-	const stats = { clicked: 0, batches: 0, tweets: 0, stoppedWhy: "idle" };
+	const /** @type {ScrollStats} */ stats = {
+			clicked: 0,
+			batches: 0,
+			tweets: 0,
+			history: [],
+			stoppedWhy: "idle",
+		};
 	let idleBatches = 0;
 	let previous = countTweets(doc);
 
@@ -78,6 +85,7 @@ async function expandAndScroll(root, options = {}, onProgress) {
 		await sleep(batchDelayMs);
 		stats.batches = batch + 1;
 		stats.tweets = countTweets(doc);
+		stats.history.push(stats.tweets);
 		onProgress?.({ ...stats });
 		if (stats.tweets >= maxTweets) {
 			stats.stoppedWhy = "max-tweets";
