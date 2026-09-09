@@ -206,6 +206,60 @@ ${cards}
 }
 
 /**
+ * Human-readable media inventory: how many files, where each lives
+ * locally (or why it doesn't), and the original URL for manual fetch.
+ * LLMs cannot download, so this is the list to act on.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot Enriched (localPath/unresolved).
+ * @returns {string}
+ */
+export function renderMediaList(snapshot) {
+	const tweets = snapshot?.tweets ?? [];
+	const sections = [];
+	let files = 0;
+	let unresolved = 0;
+	for (const tweet of tweets) {
+		const media = tweet.media ?? [];
+		if (media.length === 0) {
+			continue;
+		}
+		const lines = [];
+		for (const item of media) {
+			files += 1;
+			if (item.unresolved) {
+				unresolved += 1;
+			}
+			lines.push(mediaListLine(item));
+		}
+		sections.push(
+			`## ${authorLabel(tweet)}\n\n${tweet.url}\n\n${lines.join("\n")}`,
+		);
+	}
+	const head =
+		unresolved > 0
+			? `# Media (${files} files, ${unresolved} unresolved)`
+			: `# Media (${files} files)`;
+	if (sections.length === 0) {
+		return `${head}\n`;
+	}
+	return `${head}\n\n${sections.join("\n\n")}\n`;
+}
+
+/**
+ * One inventory line per media item: local path when downloaded,
+ * original URL always (for manual fetch), reason when absent.
+ *
+ * @param {import("./model.js").TweetMedia} item
+ * @returns {string}
+ */
+function mediaListLine(item) {
+	const location = item.localPath
+		? item.localPath
+		: `(not downloaded: ${item.unresolved ?? "unknown reason"})`;
+	return `- ${item.type}: ${location}\n  original: ${item.url}`;
+}
+
+/**
  * @param {import("./model.js").ThreadSnapshot} snapshot
  * @returns {string} Plain Markdown, LLM-upload friendly.
  */

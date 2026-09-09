@@ -364,8 +364,13 @@ export function filterFilesByPreset(files, preset, custom = []) {
 		"thread.csv",
 		"thread.xlsx",
 	]);
-	const llm = new Set(["thread.html", "thread.md"]);
-	const data = new Set(["thread.json", "thread.csv", "thread.xlsx"]);
+	const llm = new Set(["thread.html", "thread.md", "media-list.md"]);
+	const data = new Set([
+		"thread.json",
+		"thread.csv",
+		"thread.xlsx",
+		"media-list.md",
+	]);
 	const wanted =
 		preset === "llm"
 			? llm

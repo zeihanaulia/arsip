@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderThreadHtml, renderThreadMarkdown } from "../src/export-html.js";
+import {
+	renderMediaList,
+	renderThreadHtml,
+	renderThreadMarkdown,
+} from "../src/export-html.js";
 import { createThreadSnapshot, createTweet } from "../src/model.js";
 
 function sampleSnapshot() {
@@ -76,6 +80,27 @@ describe("renderThreadHtml", () => {
 		assert.ok(html.includes("blob:https://x.com/u"));
 		assert.ok(html.includes("Realistically speaking"));
 		assert.ok(html.includes("26 likes"));
+	});
+});
+
+describe("renderMediaList", () => {
+	it("lists every media item with status and locations", () => {
+		const md = renderMediaList(sampleSnapshot());
+
+		assert.ok(md.includes("# Media (4 files, 1 unresolved)"));
+		assert.ok(md.includes("media/1-0.jpg"));
+		assert.ok(md.includes("https://pbs.twimg.com/media/a.jpg"));
+		assert.ok(md.includes("fetch-failed"));
+		assert.ok(md.includes("media/2-1.vtt"));
+	});
+
+	it("skips tweets without media", () => {
+		const snapshot = sampleSnapshot();
+		for (const tweet of snapshot.tweets) {
+			tweet.media = [];
+		}
+
+		assert.equal(renderMediaList(snapshot), "# Media (0 files)\n");
 	});
 });
 

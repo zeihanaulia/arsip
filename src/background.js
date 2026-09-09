@@ -7,7 +7,11 @@
  * its own overall timeout as the last line of defence.
  */
 
-import { renderThreadHtml, renderThreadMarkdown } from "./export-html.js";
+import {
+	renderMediaList,
+	renderThreadHtml,
+	renderThreadMarkdown,
+} from "./export-html.js";
 import {
 	snapshotToCsv,
 	snapshotToRows,
@@ -425,6 +429,7 @@ function zipFiles(snapshot, manifest, zipMedia, separateOk, preset, formats) {
 					},
 					{ name: "thread.html", text: renderThreadHtml(snapshot) },
 					{ name: "thread.md", text: renderThreadMarkdown(snapshot) },
+					{ name: "media-list.md", text: renderMediaList(snapshot) },
 					{ name: "thread.csv", text: snapshotToCsv(snapshot) },
 					{
 						name: "thread.xlsx",
