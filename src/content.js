@@ -50,19 +50,23 @@ function isKnownMessage(value) {
 }
 
 /**
- * Reports which companion scripts share this tab. A stale tab (opened
- * before an extension update) answers PING but lacks newer scripts —
- * the popup turns that into a reload hint instead of a silent miss.
+ * Reports which companion scripts share this tab. DOM attributes cross
+ * isolated worlds (JS expando properties do not), so the MAIN-world
+ * hook is detected via its document marker, not a window property.
  *
  * @returns {{ hook: boolean, scroller: boolean, media: boolean, zip: boolean, sheet: boolean }}
  */
 function capabilities() {
 	const globals =
-		/** @type {{ XScroller?: unknown, XMedia?: unknown, JSZip?: unknown, XLSX?: unknown, __arsipHook?: unknown }} */ (
+		/** @type {{ XScroller?: unknown, XMedia?: unknown, JSZip?: unknown, XLSX?: unknown }} */ (
 			globalThis
 		);
+	const marker =
+		typeof document !== "undefined"
+			? document.documentElement?.getAttribute("data-arsip-hook")
+			: null;
 	return {
-		hook: globals.__arsipHook === "main",
+		hook: marker === "main",
 		scroller: typeof globals.XScroller !== "undefined",
 		media: typeof globals.XMedia !== "undefined",
 		zip: typeof globals.JSZip !== "undefined",

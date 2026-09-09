@@ -12,11 +12,18 @@
 const ARSIP_NET_EVENT = "arsip:net";
 const MAX_BODY_LENGTH = 500_000;
 
-// Presence marker so the isolated world can report whether this hook
-// shares the tab (read by capabilities() in src/content.js).
-/** @type {Record<string, unknown>} */ (
-	/** @type {unknown} */ (window)
-).__arsipHook = "main";
+// Presence marker as shared DOM state (attributes cross isolated
+// worlds; JS expando properties do not). Read by capabilities() in
+// src/content.js. documentElement may not exist yet at document_start.
+(function markPresence() {
+	const apply = () =>
+		document.documentElement?.setAttribute("data-arsip-hook", "main");
+	if (document.documentElement) {
+		apply();
+	} else {
+		document.addEventListener("DOMContentLoaded", apply, { once: true });
+	}
+})();
 
 /**
  * @param {string} url

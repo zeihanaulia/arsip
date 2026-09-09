@@ -60,7 +60,10 @@ describe("x-adapter (real Chromium)", () => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
 
-		async function pingWith(/** @type {string[]} */ scripts) {
+		async function pingWith(
+			/** @type {string[]} */ scripts,
+			/** @type {boolean} */ mainHook,
+		) {
 			const page = await browser.newPage();
 			await page.addInitScript(() => {
 				const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
@@ -84,6 +87,13 @@ describe("x-adapter (real Chromium)", () => {
 			for (const script of scripts) {
 				await page.addScriptTag({ path: join(root, script) });
 			}
+			if (mainHook) {
+				// Runs in the MAIN world like the real hook; the isolated
+				// content script must still observe it through shared DOM.
+				await page.evaluate(() => {
+					document.documentElement.setAttribute("data-arsip-hook", "main");
+				});
+			}
 			const response = await page.evaluate(() => {
 				const holder =
 					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
@@ -102,16 +112,18 @@ describe("x-adapter (real Chromium)", () => {
 				.payload;
 		}
 
-		const full = await pingWith([
-			"src/hook-main.js",
-			"src/x-adapter.js",
-			"src/scroller.js",
-			"vendor/jszip.min.js",
-			"vendor/xlsx.full.min.js",
-			"src/media.js",
-			"src/content.js",
-		]);
-		const stale = await pingWith(["src/x-adapter.js", "src/content.js"]);
+		const full = await pingWith(
+			[
+				"src/x-adapter.js",
+				"src/scroller.js",
+				"vendor/jszip.min.js",
+				"vendor/xlsx.full.min.js",
+				"src/media.js",
+				"src/content.js",
+			],
+			true,
+		);
+		const stale = await pingWith(["src/x-adapter.js", "src/content.js"], false);
 
 		assert.deepEqual(full?.caps, {
 			hook: true,
