@@ -121,13 +121,36 @@ async function mountLazyMedia(root, options = {}) {
 }
 
 /**
+ * Finds what actually scrolls the timeline: the nearest ancestor of the
+ * first tweet with real scrollable overflow. X virtualizes its timeline
+ * in an inner container, so scrolling the document never triggers the
+ * next chunk there. Falls back to the document scroller.
+ *
+ * @param {ParentNode} doc
+ * @returns {Element} Scroll target (never the document itself).
+ */
+function findScrollContainer(doc) {
+	const first =
+		doc === document
+			? document.querySelector('article[data-testid="tweet"]')
+			: null;
+	let node = first?.parentElement ?? null;
+	while (node) {
+		if (node.scrollHeight - node.clientHeight > 50) {
+			return node;
+		}
+		node = node.parentElement;
+	}
+	return document.scrollingElement ?? document.body;
+}
+
+/**
  * @param {ParentNode} doc
  */
 function scrollOnce(doc) {
-	/** @type {Element | null} */
 	const target =
 		doc === document
-			? (document.scrollingElement ?? document.body)
+			? findScrollContainer(doc)
 			: doc instanceof Element
 				? doc
 				: null;

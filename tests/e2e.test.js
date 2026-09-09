@@ -785,6 +785,34 @@ describe("x-adapter (real Chromium)", () => {
 		});
 	});
 
+	it("scrolls the inner timeline container, not just the document", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-inner.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/scroller.js") });
+
+		await page.evaluate(() =>
+			globalThis.XScroller.expandAndScroll(document, {
+				maxBatches: 3,
+				batchDelayMs: 10,
+			}),
+		);
+		const scrolled = await page.evaluate(
+			() => document.querySelector("#timeline")?.scrollTop ?? 0,
+		);
+		const count = await page.evaluate(
+			() =>
+				globalThis.XAdapter.scrapeRaw(document, location.href).tweets.length,
+		);
+
+		assert.ok(scrolled > 0, "inner container must be scrolled");
+		assert.equal(count, 2);
+	});
+
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
