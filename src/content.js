@@ -189,12 +189,16 @@ async function runScrape(autoScroll, videoMode, skipPromoted) {
 			: /** @type {unknown[]} */ (scraped.payload.tweets ?? []),
 		skipPromoted,
 	);
+	// Consume-then-clear: bodies captured while reading this thread ride
+	// along, but must never leak into the next download.
+	const api = timelineApiBodies();
+	netLog.length = 0;
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
 		sourceUrl: scraped.payload.sourceUrl ?? "",
 		scrollerMissing,
 		caps: capabilities(),
-		api: timelineApiBodies(),
+		api,
 		media: await downloadThreadMedia(tweets, videoMode),
 	});
 }

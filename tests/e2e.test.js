@@ -218,6 +218,83 @@ describe("x-adapter (real Chromium)", () => {
 		);
 	});
 
+	it("starts each scrape with a fresh network buffer", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		async function scrape() {
+			return page.evaluate(() => {
+				const holder =
+					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+						globalThis
+					);
+				const listener = holder.__listeners?.[0];
+				if (!listener) {
+					throw new Error("content script did not register a listener");
+				}
+				return new Promise((resolve) => {
+					listener({ type: "SCRAPE_START", payload: {} }, {}, resolve);
+				});
+			});
+		}
+		/**
+		 * @param {string} entryUrl
+		 * @param {string} entryBody
+		 */
+		async function captureApi(entryUrl, entryBody) {
+			await page.evaluate(
+				({ url, body }) => {
+					window.dispatchEvent(
+						new CustomEvent("arsip:net", {
+							detail: { url, status: 200, body },
+						}),
+					);
+				},
+				{ url: entryUrl, body: entryBody },
+			);
+		}
+
+		await captureApi(
+			"https://x.com/i/api/graphql/X/TweetDetail",
+			'{"first":true}',
+		);
+		const first = /** @type {{ payload?: Record<string, unknown> }} */ (
+			await scrape()
+		);
+		await captureApi(
+			"https://x.com/i/api/graphql/X/TweetDetail",
+			'{"second":true}',
+		);
+		const second = /** @type {{ payload?: Record<string, unknown> }} */ (
+			await scrape()
+		);
+
+		assert.deepEqual(first.payload?.api, ['{"first":true}']);
+		assert.deepEqual(second.payload?.api, ['{"second":true}']);
+	});
+
 	it("answers DONE with scrollerMissing when autoScroll has no scroller", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());
