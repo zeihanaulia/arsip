@@ -343,6 +343,28 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 (tidak ada — B1 network interception sudah dipromosikan jadi Task 7)
 
+### B2: Dukungan situs generik (visi Arsip)
+
+**Konteks:** Popup sekarang menolak situs non-X secara eksplisit
+(`activeThreadTab`). Visi repo adalah downloader generik: buka halaman
+apa saja → arsip offline + konteks LLM. V1 mengunci X dulu agar mekanik
+inti (capture, merge, exporter, ZIP) terbukti sebelum digeneralisasi.
+
+**Arah desain (draf, belum diputus):**
+- Kontrak `SiteAdapter`: `detect(url, document)`, `scrapeList()`,
+  `scrollMore()`, `mediaInventory()` — `x-adapter.js` jadi implementasi
+  pertama; adapter generik (readability-style: artikel + gambar) kedua
+- Manifest `matches` meluas per adapter yang terdaftar; permission
+  tetap minimal per-match, tanpa `<all_urls>` blanket
+- Hook network tetap X-spesifik (opt-in per adapter); generic path
+  murni DOM + fetch media secontext
+- Popup: pesan unsupported berubah jadi pemilih adapter / fallback
+  generic tornado
+
+**Kriteria selesai (draf):** 1 situs non-X (mis. artikel blog) terarsip
+end-to-end (HTML/MD + gambar lokal + ZIP) dengan test E2E fixture-nya
+sendiri; tidak ada regresi jalur X (seluruh suite hijau).
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |

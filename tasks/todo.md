@@ -52,3 +52,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [ ] Semua acceptance Task 1-9 terpenuhi
 - [ ] ZIP final siap upload ke ChatGPT tanpa missing mayor
 - [ ] Siap review; belum publish ke Web Store (out of scope v1)
+
+## Backlog (post-V1)
+
+- [ ] B2: Dukungan situs generik (detail di `tasks/plan.md`)
