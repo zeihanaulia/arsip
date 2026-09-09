@@ -82,6 +82,44 @@ describe("tweetToRow", () => {
 		assert.equal(cell("Scraped At"), "2026-09-07T08:47:04.748Z");
 	});
 
+	it("fills API-provided user columns and leaves unknown ones empty", () => {
+		const tweet = sampleSnapshot().tweets[0];
+		tweet.user = {
+			...tweet.user,
+			description: "CEO",
+			followersCount: 387449,
+			blueVerified: true,
+			verified: false,
+		};
+		const row = tweetToRow(tweet, "2026-09-07T08:47:04.748Z");
+		const cell = (/** @type {string} */ name) =>
+			row[THREAD_COLUMNS.indexOf(name)];
+
+		assert.equal(cell("User Description"), "CEO");
+		assert.equal(cell("User Followers Count"), "387449");
+		assert.equal(cell("User Friends Count"), "");
+		assert.equal(cell("User Favourites Count"), "");
+		assert.equal(cell("User Is Blue Verified"), "Yes");
+		assert.equal(cell("User Is Verified"), "No");
+	});
+
+	it("fills API-backed counts, language, and viewer flags", () => {
+		const tweet = sampleSnapshot().tweets[0];
+		tweet.metrics = { ...tweet.metrics, quotes: 410, bookmarks: 2036 };
+		tweet.language = "en";
+		tweet.favorited = false;
+		tweet.isQuoteStatus = false;
+		const row = tweetToRow(tweet, "2026-09-07T08:47:04.748Z");
+		const cell = (/** @type {string} */ name) =>
+			row[THREAD_COLUMNS.indexOf(name)];
+
+		assert.equal(cell("Quote Count"), "410");
+		assert.equal(cell("Bookmark Count"), "2036");
+		assert.equal(cell("Language"), "en");
+		assert.equal(cell("Favorited"), "No");
+		assert.equal(cell("Is Quote Status"), "No");
+	});
+
 	it("derives entities honestly from the text itself", () => {
 		const row = tweetToRow(
 			sampleSnapshot().tweets[0],

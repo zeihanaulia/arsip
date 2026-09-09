@@ -78,7 +78,7 @@ export function tweetToRow(tweet, scrapedAt) {
 		...mediaCells(tweet.media),
 		...relationCells(tweet),
 		...countCells(tweet.metrics),
-		...flagCells(),
+		...flagCells(tweet),
 		...entityCells(tweet.text),
 		...userCells(tweet.user),
 		scrapedAt ?? "", // Scraped At
@@ -122,7 +122,6 @@ function relationCells(tweet) {
 		"", // In Reply To Screen Name (no DOM source)
 	];
 }
-
 /**
  * @param {import("./model.js").TweetMetrics} [metrics]
  * @returns {string[]} Reply/Retweet/Favorite/Quote/Bookmark/View counts.
@@ -135,17 +134,26 @@ function countCells(metrics) {
 		String(counts.replies ?? 0),
 		String(counts.reposts ?? 0),
 		String(counts.likes ?? 0),
-		"", // Quote Count (no DOM source)
-		"", // Bookmark Count (no DOM source)
+		countCell(counts.quotes),
+		countCell(counts.bookmarks),
 		String(counts.views ?? 0),
 	];
 }
 
 /**
- * @returns {string[]} Viewer/flag fields, all without a DOM source.
+ * Viewer relations and flags: API-backed Yes/No, "" when unknown.
+ *
+ * @param {import("./model.js").Tweet} tweet
+ * @returns {string[]} Favorited, Retweeted, Bookmarked, Is Quote, Language.
  */
-function flagCells() {
-	return ["", "", "", "", ""];
+function flagCells(tweet) {
+	return [
+		flagCell(tweet.favorited),
+		flagCell(tweet.retweeted),
+		flagCell(tweet.bookmarked),
+		flagCell(tweet.isQuoteStatus),
+		tweet.language ?? "",
+	];
 }
 
 /**
@@ -160,7 +168,6 @@ function entityCells(text) {
 		collectEntities(source, /@(\w+)/g),
 	];
 }
-
 /**
  * @param {import("./model.js").TweetUser} [user]
  * @returns {string[]} The 17 user columns in order.
@@ -173,21 +180,43 @@ function userCells(user) {
 		profile.id ?? "",
 		profile.name ?? "",
 		profile.screenName ?? "",
-		"", // User Description (no DOM source)
-		"", // User Followers Count (no DOM source)
-		"", // User Friends Count (no DOM source)
-		"", // User Favourites Count (no DOM source)
-		"", // User Statuses Count (no DOM source)
-		"", // User Listed Count (no DOM source)
+		profile.description ?? "",
+		countCell(profile.followersCount),
+		countCell(profile.friendsCount),
+		"", // User Favourites Count (no API/DOM source)
+		countCell(profile.statusesCount),
+		"", // User Listed Count (no API/DOM source)
 		profile.avatarUrl ?? "",
-		"", // User Profile Banner Url (no DOM source)
-		"", // User Location (no DOM source)
-		"", // User Is Blue Verified (no DOM source)
-		"", // User Is Verified (no DOM source)
-		"", // User Is Protected (no DOM source)
-		"", // User Professional Type (no DOM source)
-		"", // User Created At (no DOM source)
+		profile.bannerUrl ?? "",
+		profile.location ?? "",
+		flagCell(profile.blueVerified),
+		flagCell(profile.verified),
+		flagCell(profile.protected),
+		profile.professionalType ?? "",
+		profile.createdAt ?? "",
 	];
+}
+
+/**
+ * @param {number} [value]
+ * @returns {string} "" when unknown — 0 would be a claim.
+ */
+function countCell(value) {
+	return typeof value === "number" ? String(value) : "";
+}
+
+/**
+ * @param {boolean} [value]
+ * @returns {string} Yes/No when known, "" otherwise.
+ */
+function flagCell(value) {
+	if (value === true) {
+		return "Yes";
+	}
+	if (value === false) {
+		return "No";
+	}
+	return "";
 }
 
 /**

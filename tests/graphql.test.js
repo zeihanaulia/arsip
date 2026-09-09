@@ -34,10 +34,32 @@ describe("extractRawTweets", () => {
 		assert.equal(root.metrics.reposts, 178);
 		assert.equal(root.metrics.replies, 529);
 		assert.equal(root.metrics.views, 2580704);
+		assert.equal(root.metrics.quotes, 410);
+		assert.equal(root.metrics.bookmarks, 2036);
+		assert.equal(root.language, "en");
 		assert.equal(root.user.screenName, "theo");
 		assert.equal(root.user.name, "Theo - t3.gg");
 		assert.equal(root.conversationId, "2096854674938941448");
 		assert.equal(tweets[1].replyTo, "2096854674938941448");
+	});
+
+	it("reads extended user fields the DOM never provides", () => {
+		const user = extractRawTweets(payload)[0].user;
+
+		assert.equal(user.followersCount, 387449);
+		assert.equal(user.friendsCount, 4228);
+		assert.equal(user.statusesCount, 66559);
+		assert.equal(user.location, "San Francisco, CA");
+		assert.equal(user.blueVerified, true);
+		assert.equal(user.verified, false);
+		assert.equal(user.protected, false);
+		assert.equal(user.professionalType, "Creator");
+		assert.ok((user.bannerUrl ?? "").includes("profile_banners"), "banner url");
+		assert.ok(
+			(user.description ?? "").includes("Full time CEO"),
+			"description",
+		);
+		assert.ok((user.createdAt ?? "").includes("2016"), "user created year");
 	});
 
 	it("keeps the poster and the best mp4 variant for videos", () => {

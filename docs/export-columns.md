@@ -20,32 +20,32 @@ Aturan: field tanpa sumber DOM diisi kosong. Angka tidak pernah dikarang.
 | Reply Count | `metrics.replies` | 0 bila tidak terbaca (default model) |
 | Retweet Count | `metrics.reposts` | 0 bila tidak terbaca (default model) |
 | Favorite Count | `metrics.likes` | 0 bila tidak terbaca (default model) |
-| Quote Count | — | **kosong, tidak ada di DOM** (tidak diisi 0 — 0 adalah klaim) |
-| Bookmark Count | — | **kosong, tidak ada di DOM** |
+| Quote Count | `metrics.quotes` (API) | kosong bila DOM-only — 0 adalah klaim |
+| Bookmark Count | `metrics.bookmarks` (API) | kosong bila DOM-only |
 | View Count | `metrics.views` | 0 bila tidak terbaca (default model) |
-| Favorited | — | **kosong** (relasi viewer, tidak ada di DOM) |
-| Retweeted | — | **kosong** (relasi viewer, tidak ada di DOM) |
-| Bookmarked | — | **kosong** (relasi viewer, tidak ada di DOM) |
-| Is Quote Status | — | **kosong, tidak ada di DOM** |
-| Language | — | **kosong, tidak ada di DOM** |
+| Favorited | API `favorited` → Yes/No | **kosong** bila DOM-only |
+| Retweeted | API `retweeted` → Yes/No | **kosong** bila DOM-only |
+| Bookmarked | API `bookmarked` → Yes/No | **kosong** bila DOM-only |
+| Is Quote Status | API `is_quote_status` → Yes/No | **kosong** bila DOM-only |
+| Language | API `lang` | **kosong** bila DOM-only |
 | Expanded URLs | URL http(s) diekstrak dari teks tweet | derivasi jujur dari teks, bukan API |
 | Hashtags | `#tag` diekstrak dari teks tweet | derivasi jujur dari teks |
 | User Mentions | `@user` diekstrak dari teks tweet | derivasi jujur dari teks |
 | User Id | `user.id` | kosong bila tidak ada di DOM |
 | User Name | `user.name` | — |
 | User Screen Name | `user.screenName` | — |
-| User Description | — | **kosong, tidak ada di DOM** |
-| User Followers Count | — | **kosong, tidak ada di DOM** |
-| User Friends Count | — | **kosong, tidak ada di DOM** |
-| User Favourites Count | — | **kosong, tidak ada di DOM** |
-| User Statuses Count | — | **kosong, tidak ada di DOM** |
-| User Listed Count | — | **kosong, tidak ada di DOM** |
+| User Description | `user.description` (API) | **kosong** bila DOM-only |
+| User Followers Count | `user.followersCount` (API) | **kosong** bila DOM-only |
+| User Friends Count | `user.friendsCount` (API) | **kosong** bila DOM-only |
+| User Favourites Count | — | **kosong, tidak ada di API maupun DOM** |
+| User Statuses Count | `user.statusesCount` (API) | **kosong** bila DOM-only |
+| User Listed Count | — | **kosong, tidak ada di API maupun DOM** |
 | User Avatar Url | `user.avatarUrl` | — |
-| User Profile Banner Url | — | **kosong, tidak ada di DOM** |
-| User Location | — | **kosong, tidak ada di DOM** |
-| User Is Blue Verified | — | **kosong, tidak ada di DOM** |
-| User Is Verified | — | **kosong, tidak ada di DOM** |
-| User Is Protected | — | **kosong, tidak ada di DOM** |
-| User Professional Type | — | **kosong, tidak ada di DOM** |
-| User Created At | — | **kosong, tidak ada di DOM** |
+| User Profile Banner Url | `user.bannerUrl` (API) | **kosong** bila DOM-only |
+| User Location | `user.location` (API) | **kosong** bila DOM-only |
+| User Is Blue Verified | API → Yes/No | **kosong** bila DOM-only |
+| User Is Verified | API → Yes/No | **kosong** bila DOM-only |
+| User Is Protected | API → Yes/No | **kosong** bila DOM-only |
+| User Professional Type | `user.professionalType` (API) | **kosong** bila DOM-only |
+| User Created At | `user.createdAt` (API) | **kosong** bila DOM-only |
 | Scraped At | waktu scrape (ISO) | — |

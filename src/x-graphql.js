@@ -11,6 +11,17 @@
  * @property {string} name
  * @property {string} screenName
  * @property {string} avatarUrl
+ * @property {string} description
+ * @property {number} followersCount
+ * @property {number} friendsCount
+ * @property {number} statusesCount
+ * @property {string} bannerUrl
+ * @property {string} location
+ * @property {boolean} blueVerified
+ * @property {boolean} verified
+ * @property {boolean} protected
+ * @property {string} professionalType
+ * @property {string} createdAt ISO timestamp, "" when unparseable.
  */
 
 /**
@@ -27,9 +38,14 @@
  * @property {string} createdAt ISO timestamp, "" when unparseable.
  * @property {ApiUser} user
  * @property {ApiMedia[]} media
- * @property {{ replies: number, reposts: number, likes: number, views: number }} metrics
+ * @property {{ replies: number, reposts: number, likes: number, quotes: number, bookmarks: number, views: number }} metrics
  * @property {string} conversationId
  * @property {string | null} replyTo
+ * @property {string} language
+ * @property {boolean} favorited
+ * @property {boolean} retweeted
+ * @property {boolean} bookmarked
+ * @property {boolean} isQuoteStatus
  */
 
 /**
@@ -127,11 +143,30 @@ function parseUser(result) {
 	const user = asRecord(asRecord(asRecord(result.core).user_results).result);
 	const core = asRecord(user.core);
 	const avatar = asRecord(user.avatar);
+	const banner = asRecord(user.banner);
+	const bio = asRecord(user.profile_bio);
+	const location = asRecord(user.location);
+	const relationship = asRecord(user.relationship_counts);
+	const tweetCounts = asRecord(user.tweet_counts);
+	const verification = asRecord(user.verification);
+	const professional = asRecord(user.professional);
+	const createdAt = Date.parse(textOf(core.created_at));
 	return {
 		id: textOf(user.rest_id),
 		name: textOf(core.name),
 		screenName: textOf(core.screenName ?? core.screen_name),
 		avatarUrl: textOf(avatar.image_url),
+		description: textOf(bio.description),
+		followersCount: countOf(relationship.followers),
+		friendsCount: countOf(relationship.following),
+		statusesCount: countOf(tweetCounts.tweets),
+		bannerUrl: textOf(banner.image_url),
+		location: textOf(location.location),
+		blueVerified: user.is_blue_verified === true,
+		verified: verification.verified === true,
+		protected: asRecord(user.privacy).protected === true,
+		professionalType: textOf(professional.professional_type),
+		createdAt: Number.isNaN(createdAt) ? "" : new Date(createdAt).toISOString(),
 	};
 }
 
@@ -227,10 +262,17 @@ function parseTweetResult(result) {
 			replies: countOf(legacy.reply_count),
 			reposts: countOf(legacy.retweet_count),
 			likes: countOf(legacy.favorite_count),
+			quotes: countOf(legacy.quote_count),
+			bookmarks: countOf(legacy.bookmark_count),
 			views: countOf(views.count),
 		},
 		conversationId: textOf(legacy.conversation_id_str),
 		replyTo: textOf(legacy.in_reply_to_status_id_str) || null,
+		language: textOf(legacy.lang),
+		favorited: legacy.favorited === true,
+		retweeted: legacy.retweeted === true,
+		bookmarked: legacy.bookmarked === true,
+		isQuoteStatus: legacy.is_quote_status === true,
 	};
 }
 
@@ -273,9 +315,31 @@ function mergeUser(domUser, apiUser) {
 	const merged = /** @type {Record<string, unknown>} */ ({
 		...(domUser ?? {}),
 	});
-	for (const key of ["id", "name", "screenName", "avatarUrl"]) {
+	for (const key of [
+		"id",
+		"name",
+		"screenName",
+		"avatarUrl",
+		"description",
+		"bannerUrl",
+		"location",
+		"professionalType",
+		"createdAt",
+	]) {
 		const value = asRecord(apiUser)[key];
 		if (typeof value === "string" && value !== "") {
+			merged[key] = value;
+		}
+	}
+	for (const key of ["followersCount", "friendsCount", "statusesCount"]) {
+		const value = asRecord(apiUser)[key];
+		if (typeof value === "number") {
+			merged[key] = value;
+		}
+	}
+	for (const key of ["blueVerified", "verified", "protected"]) {
+		const value = asRecord(apiUser)[key];
+		if (typeof value === "boolean") {
 			merged[key] = value;
 		}
 	}
@@ -312,6 +376,11 @@ export function mergeApiIntoSnapshot(snapshot, apiTweets) {
 function applyApiTweet(tweet, api) {
 	tweet.metrics = { ...api.metrics };
 	tweet.user = mergeUser(tweet.user, api.user);
+	tweet.language = api.language;
+	tweet.favorited = api.favorited;
+	tweet.retweeted = api.retweeted;
+	tweet.bookmarked = api.bookmarked;
+	tweet.isQuoteStatus = api.isQuoteStatus;
 	if (api.conversationId !== "") {
 		tweet.conversationId = api.conversationId;
 	}

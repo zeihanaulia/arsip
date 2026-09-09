@@ -10,6 +10,17 @@
  * @property {string} name
  * @property {string} screenName
  * @property {string} avatarUrl
+ * @property {string} [description] API-only (no DOM source).
+ * @property {number} [followersCount] API-only.
+ * @property {number} [friendsCount] API-only.
+ * @property {number} [statusesCount] API-only.
+ * @property {string} [bannerUrl] API-only.
+ * @property {string} [location] API-only.
+ * @property {boolean} [blueVerified] API-only.
+ * @property {boolean} [verified] API-only.
+ * @property {boolean} [protected] API-only.
+ * @property {string} [professionalType] API-only.
+ * @property {string} [createdAt] API-only, ISO timestamp.
  */
 
 /**
@@ -27,6 +38,8 @@
  * @property {number} reposts
  * @property {number} likes
  * @property {number} views
+ * @property {number} [quotes] API-only (no DOM source).
+ * @property {number} [bookmarks] API-only.
  */
 
 /**
@@ -41,6 +54,11 @@
  * @property {string | null} replyTo Parent tweet id, null for the thread root.
  * @property {string} conversationId
  * @property {boolean} inferred True when order/relation was derived from DOM order, not explicit data.
+ * @property {string} [language] API-only (no DOM source).
+ * @property {boolean} [favorited] API-only viewer relation.
+ * @property {boolean} [retweeted] API-only viewer relation.
+ * @property {boolean} [bookmarked] API-only viewer relation.
+ * @property {boolean} [isQuoteStatus] API-only.
  */
 
 /**
