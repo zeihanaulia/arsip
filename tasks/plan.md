@@ -256,29 +256,31 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ## Task 7: Network response capture via MAIN-world hook
 
-**Description:** Berhenti mengandalkan DOM malas sebagai sumber utama. Hook di MAIN world membungkus `fetch`/`XHR`, menangkap respons API X (GraphQL JSON: tweet lengkap, counts asli, user lengkap, varian mp4, subtitle), teruskan ke isolated world via event, lalu ke background untuk digabung ke snapshot. DOM tetap sebagai fallback bila hook tidak dapat apa-apa. Tanpa permission baru, tanpa API key, tanpa backend — tetap hak sesi tab.
+**Description:** Berhenti mengandalkan DOM malas sebagai sumber utama dan berhenti menebak nama endpoint. Hook di MAIN world membungkus `fetch`/`XHR` dan menangkap SEMUA respons JSON X (tanpa filter nama endpoint), teruskan ke isolated world via event. Popup dapat tombol "Download network log" untuk mengunduh hasil tangkapan — dari log itulah endpoint data + parser dilatih. Tanpa permission baru, tanpa API key, tanpa backend — tetap hak sesi tab.
 
 **Acceptance criteria:**
-- [ ] Mekanisme hook terbukti di fixture: `fetch` yang di-stub tertangkap + payload sampai ke background (E2E)
-- [ ] Parser GraphQL X dilatih dari **respons asli yang disimpan user via DevTools** (fixture `tests/fixtures/x-graphql-*.json`): tweet, counts, user, varian mp4, subtitle terekstrak
+- [ ] Mekanisme hook terbukti di fixture: `fetch` + `XHR` yang di-stub tertangkap + payload sampai ke content script (E2E)
+- [ ] Tombol popup "Download network log" menghasilkan 1 file JSON berisi entri `{url, status, mime, truncated, body}` dengan cap ukuran/jumlah
+- [ ] Parser (`x-graphql.js`) dilatih dari **network log asli hasil tangkapan user** (BUKAN tebakan skema): tweet, counts, user, varian mp4, subtitle terekstrak
 - [ ] Hasil gabungan: counts bukan 0 lagi bila API menyediakannya; video mp4 langsung ter-download; subtitle masuk caption; DOM fallback tidak regresi (semua test lama hijau)
 - [ ] Tidak ada request ke server manapun selain X/CDN-nya; tidak ada `eval`/remote-code; hook hanya baca respons, tidak mengubah request
 
 **Verification:**
-- [ ] E2E mekanisme (stub fetch) hijau headed
-- [ ] Parser hijau lawan fixture respons asli
+- [ ] E2E mekanisme (stub fetch/XHR) hijau headed
+- [ ] Parser hijau lawan fixture dari network log asli
 - [ ] Manual check thread Theo: counts terisi, mp4 ke-download (mode separate), subtitle ada bila API menyediakannya
 
-**Dependencies:** Task 4 (media pipeline dipakai ulang); **blocker eksternal**: butuh 1 file respons GraphQL asli dari user (DevTools Network → Save response)
+**Dependencies:** Task 4 (media pipeline dipakai ulang); **blocker eksternal**: user browse thread dengan hook aktif lalu klik Download network log, kirim file-nya
 
 **Files likely touched:**
 - `src/hook-main.js` (baru, classic, world MAIN: bungkus fetch/XHR + forward event)
-- `src/content.js` (bridge event MAIN→isolated→background, pesan `API_CAPTURED`)
-- `src/background.js` (cache payload API per tab)
-- `src/x-graphql.js` (baru: parser respons → Tweet mentah; kontrak: tidak ngarang field)
+- `src/content.js` (buffer tangkapan + layani `DUMP_NETWORK`, bridge event MAIN→isolated)
+- `src/background.js` (download log JSON)
+- `src/popup.html`, `src/popup.js` (tombol Download network log)
+- `src/x-graphql.js` (baru SETELAH log asli ada: parser respons → Tweet mentah; kontrak: tidak ngarang field)
 - `manifest.json` (content_scripts world MAIN kedua)
 
-**Estimated scope:** Large (5 files) — slice: mekanisme dulu, parser setelah fixture asli ada
+**Estimated scope:** Large (5-6 files) — slice: tangkapan generik + tombol dulu, parser setelah log asli ada
 
 ### Phase 4: UX + QA packaging
 
