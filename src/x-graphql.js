@@ -171,8 +171,11 @@ function parseUser(result) {
 }
 
 /**
- * Keeps the poster plus the single highest-bitrate mp4. HLS playlists
- * are manifests, not media — never emitted.
+ * Keeps the poster plus the single smallest mp4. Smallest on purpose:
+ * this pipeline archives for humans and LLMs, not for re-broadcast —
+ * the 256kbps preview carries the content at a fetchable size while
+ * the 4K variant would blow every budget. HLS playlists are manifests,
+ * not media — never emitted.
  *
  * @param {Record<string, unknown>} result
  * @returns {ApiMedia[]}
@@ -206,7 +209,7 @@ function videoMedia(item) {
 	if (typeof item.media_url_https === "string") {
 		out.push({ url: item.media_url_https, type: "photo" });
 	}
-	const best = bestMp4(item.video_info);
+	const best = smallestMp4(item.video_info);
 	if (best) {
 		out.push({ url: best, type: "video" });
 	}
@@ -215,13 +218,13 @@ function videoMedia(item) {
 
 /**
  * @param {unknown} videoInfo
- * @returns {string | null} Highest-bitrate mp4 URL, or null.
+ * @returns {string | null} Smallest-bitrate mp4 URL, or null.
  */
-function bestMp4(videoInfo) {
+function smallestMp4(videoInfo) {
 	const info = /** @type {Record<string, unknown>} */ (videoInfo ?? {});
 	const variants = Array.isArray(info.variants) ? info.variants : [];
 	let best = null;
-	let bestBitrate = -1;
+	let bestBitrate = Number.POSITIVE_INFINITY;
 	for (const rawVariant of variants) {
 		const variant = /** @type {Record<string, unknown>} */ (rawVariant ?? {});
 		if (
@@ -230,7 +233,7 @@ function bestMp4(videoInfo) {
 		) {
 			continue;
 		}
-		if (countOf(variant.bitrate) > bestBitrate) {
+		if (countOf(variant.bitrate) < bestBitrate) {
 			bestBitrate = countOf(variant.bitrate);
 			best = variant.url;
 		}

@@ -526,6 +526,30 @@ describe("x-adapter (real Chromium)", () => {
 			assert.equal(playlistVerdict, false);
 		});
 
+		it("aborts fetches past the byte budget instead of downloading gigabytes", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread-media.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/media.js") });
+
+			const outcome = await page.evaluate(async () => {
+				try {
+					await globalThis.XMedia.fetchBytes(
+						"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+						{ maxBytes: 10 },
+					);
+					return "downloaded";
+				} catch (error) {
+					return error instanceof Error ? error.message : "unknown";
+				}
+			});
+
+			assert.equal(outcome, "media-too-large");
+		});
+
 		it("zips files with the vendored JSZip and reads them back", async (t) => {
 			const browser = await chromium.launch({ headless: !headed });
 			t.after(() => browser.close());

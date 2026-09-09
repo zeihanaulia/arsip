@@ -76,6 +76,13 @@ describe("extractRawTweets", () => {
 		assert.ok(!mp4.url.includes(".m3u8"), "never an HLS playlist");
 	});
 
+	it("prefers the smallest mp4 variant for fetchability", () => {
+		const tweets = extractRawTweets(payload);
+		const mp4 = tweets[0].media.find((item) => item.type === "video");
+
+		assert.ok(mp4?.url.includes("/480x270/"), "lowest bitrate wins");
+	});
+
 	it("ignores non-tweet results instead of guessing", () => {
 		const tweets = extractRawTweets({ data: {} });
 

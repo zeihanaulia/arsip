@@ -41,19 +41,54 @@ function isFetchable(url) {
 }
 
 /**
+ * Fetches bytes with a timeout and a byte budget. Large videos must
+ * fail fast (too-large/timeout) instead of stalling the whole scrape
+ * while gigabytes download into a message channel.
+ *
  * @param {string} url
+ * @param {{ timeoutMs?: number, maxBytes?: number }} [options]
  * @returns {Promise<FetchedBytes>}
  */
-async function fetchBytes(url) {
-	const response = await fetch(url);
-	if (!response.ok) {
-		throw new Error(`media fetch failed: ${response.status} for ${url}`);
+async function fetchBytes(url, options = {}) {
+	const { timeoutMs = 30_000, maxBytes = 21_000_000 } = options;
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		const response = await fetch(url, { signal: controller.signal });
+		if (!response.ok) {
+			throw new Error(`media fetch failed: ${response.status} for ${url}`);
+		}
+		const mime = (response.headers.get("content-type") ?? "")
+			.split(";")[0]
+			.trim();
+		const reader = response.body?.getReader();
+		if (!reader) {
+			throw new Error(`media body unreadable for ${url}`);
+		}
+		const chunks = [];
+		let total = 0;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) {
+				break;
+			}
+			total += value.length;
+			if (total > maxBytes) {
+				await reader.cancel().catch(() => {});
+				throw new Error("media-too-large");
+			}
+			chunks.push(value);
+		}
+		const merged = new Uint8Array(total);
+		let offset = 0;
+		for (const chunk of chunks) {
+			merged.set(chunk, offset);
+			offset += chunk.length;
+		}
+		return { base64: bytesToBase64(merged), mime };
+	} finally {
+		clearTimeout(timer);
 	}
-	const mime = (response.headers.get("content-type") ?? "")
-		.split(";")[0]
-		.trim();
-	const buffer = await response.arrayBuffer();
-	return { base64: bytesToBase64(new Uint8Array(buffer)), mime };
 }
 
 /**

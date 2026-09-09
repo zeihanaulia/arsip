@@ -318,8 +318,6 @@ async function expandThread(scroller, onBatch) {
 	}
 	return false;
 }
-/** Per-file cap so one video cannot kill the message channel (~21MB). */
-const MAX_MEDIA_BASE64_LENGTH = 28_000_000;
 
 /**
  * @param {unknown[]} tweets Raw adapter tweets.
@@ -379,14 +377,28 @@ async function downloadMediaItem(tweetId, index, rawEntry, videoMode) {
 	}
 	try {
 		const fetched = await media.fetchBytes?.(url);
-		if (!fetched || fetched.base64.length > MAX_MEDIA_BASE64_LENGTH) {
-			return { ...base, unresolved: "too-large" };
+		if (!fetched) {
+			return { ...base, unresolved: "fetch-failed" };
 		}
 		const localPath = media.localName?.(tweetId, index, url, fetched.mime);
 		return { ...base, localPath, mime: fetched.mime, base64: fetched.base64 };
-	} catch {
-		return { ...base, unresolved: "fetch-failed" };
+	} catch (error) {
+		return { ...base, unresolved: classifyFetchError(error) };
 	}
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function classifyFetchError(error) {
+	if (error instanceof Error && error.message === "media-too-large") {
+		return "too-large";
+	}
+	if (error instanceof Error && error.name === "AbortError") {
+		return "fetch-timeout";
+	}
+	return "fetch-failed";
 }
 
 /**
