@@ -4,6 +4,7 @@
  * guessed from URL patterns. Works on captured responses (TweetDetail,
  * TweetResultByRestId); DOM scraping stays in x-adapter.js.
  */
+import { createTweet } from "./model.js";
 
 /**
  * @typedef {Object} ApiUser
@@ -47,7 +48,6 @@
  * @property {boolean} bookmarked
  * @property {boolean} isQuoteStatus
  */
-
 /**
  * Narrows unknown JSON to a record. Single choke point so nested
  * traversal stays readable and type-safe without cast clutter.
@@ -356,14 +356,53 @@ function mergeUser(domUser, apiUser) {
  * @returns {import("./model.js").ThreadSnapshot} The same snapshot.
  */
 export function mergeApiIntoSnapshot(snapshot, apiTweets) {
-	const byId = new Map((apiTweets ?? []).map((tweet) => [tweet.id, tweet]));
+	const seen = new Set((snapshot?.tweets ?? []).map((tweet) => tweet.id));
+	const byId = new Map();
+	for (const tweet of apiTweets ?? []) {
+		if (tweet?.id && !byId.has(tweet.id)) {
+			byId.set(tweet.id, tweet);
+		}
+	}
 	for (const tweet of snapshot?.tweets ?? []) {
 		const api = byId.get(tweet.id);
 		if (api) {
 			applyApiTweet(tweet, api);
 		}
 	}
+	for (const api of byId.values()) {
+		if (!seen.has(api.id)) {
+			seen.add(api.id);
+			snapshot.tweets.push(apiTweetToTweet(api));
+		}
+	}
 	return snapshot;
+}
+
+/**
+ * Converts an API tweet into a snapshot Tweet. Reply refs from the API
+ * are explicit, so inferred is false exactly when a parent is known.
+ *
+ * @param {ApiTweet} api
+ * @returns {import("./model.js").Tweet}
+ */
+function apiTweetToTweet(api) {
+	return createTweet({
+		id: api.id,
+		text: api.text,
+		url: api.url,
+		createdAt: api.createdAt,
+		user: { ...api.user },
+		media: api.media.map((item) => ({ ...item })),
+		metrics: { ...api.metrics },
+		conversationId: api.conversationId,
+		replyTo: api.replyTo,
+		inferred: !api.replyTo,
+		language: api.language,
+		favorited: api.favorited,
+		retweeted: api.retweeted,
+		bookmarked: api.bookmarked,
+		isQuoteStatus: api.isQuoteStatus,
+	});
 }
 
 /**
