@@ -54,14 +54,15 @@ function isKnownMessage(value) {
  * before an extension update) answers PING but lacks newer scripts —
  * the popup turns that into a reload hint instead of a silent miss.
  *
- * @returns {{ scroller: boolean, media: boolean, zip: boolean, sheet: boolean }}
+ * @returns {{ hook: boolean, scroller: boolean, media: boolean, zip: boolean, sheet: boolean }}
  */
 function capabilities() {
 	const globals =
-		/** @type {{ XScroller?: unknown, XMedia?: unknown, JSZip?: unknown, XLSX?: unknown }} */ (
+		/** @type {{ XScroller?: unknown, XMedia?: unknown, JSZip?: unknown, XLSX?: unknown, __arsipHook?: unknown }} */ (
 			globalThis
 		);
 	return {
+		hook: globals.__arsipHook === "main",
 		scroller: typeof globals.XScroller !== "undefined",
 		media: typeof globals.XMedia !== "undefined",
 		zip: typeof globals.JSZip !== "undefined",

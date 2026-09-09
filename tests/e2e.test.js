@@ -103,6 +103,7 @@ describe("x-adapter (real Chromium)", () => {
 		}
 
 		const full = await pingWith([
+			"src/hook-main.js",
 			"src/x-adapter.js",
 			"src/scroller.js",
 			"vendor/jszip.min.js",
@@ -113,12 +114,14 @@ describe("x-adapter (real Chromium)", () => {
 		const stale = await pingWith(["src/x-adapter.js", "src/content.js"]);
 
 		assert.deepEqual(full?.caps, {
+			hook: true,
 			scroller: true,
 			media: true,
 			zip: true,
 			sheet: true,
 		});
 		assert.deepEqual(stale?.caps, {
+			hook: false,
 			scroller: false,
 			media: false,
 			zip: false,

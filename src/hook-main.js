@@ -12,6 +12,12 @@
 const ARSIP_NET_EVENT = "arsip:net";
 const MAX_BODY_LENGTH = 500_000;
 
+// Presence marker so the isolated world can report whether this hook
+// shares the tab (read by capabilities() in src/content.js).
+/** @type {Record<string, unknown>} */ (
+	/** @type {unknown} */ (window)
+).__arsipHook = "main";
+
 /**
  * @param {string} url
  * @param {number} status

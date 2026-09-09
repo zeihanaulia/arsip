@@ -276,7 +276,7 @@ async function pingContentScript() {
 		const caps = /** @type {Record<string, unknown>} */ (
 			reply.payload.caps ?? {}
 		);
-		const missing = ["scroller", "media", "zip", "sheet"].filter(
+		const missing = ["hook", "scroller", "media", "zip", "sheet"].filter(
 			(key) => caps[key] !== true,
 		);
 		if (missing.length === 0) {

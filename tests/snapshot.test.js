@@ -398,6 +398,11 @@ describe("captureStats", () => {
 			"mounting",
 		);
 	});
+
+	it("records how many API bodies rode along", () => {
+		assert.equal(captureStats({}, { apiBodies: 3 }).apiBodies, 3);
+		assert.equal("apiBodies" in captureStats({}, {}), false);
+	});
 });
 
 describe("filenameForSnapshot", () => {

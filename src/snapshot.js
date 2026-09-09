@@ -252,8 +252,8 @@ export function isRootCaptured(snapshot) {
  * of guessing.
  *
  * @param {Record<string, unknown>} [progress] Last scroller progress.
- * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown }} [options]
- * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string }}
+ * @param {{ autoScroll?: unknown, videoMode?: unknown, rootCaptured?: unknown, caps?: unknown, apiBodies?: unknown }} [options]
+ * @returns {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number }}
  */
 export function captureStats(progress = {}, options = {}) {
 	const stoppedWhy =
@@ -266,13 +266,16 @@ export function captureStats(progress = {}, options = {}) {
 			? options.videoMode
 			: "bundle";
 	const result =
-		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string }} */ ({
+		/** @type {{ stoppedWhy: string, batches: number, autoScroll: boolean, videoMode: string, rootCaptured: boolean, phase?: string, caps?: Record<string, unknown>, expandError?: string, apiBodies?: number }} */ ({
 			stoppedWhy,
 			batches,
 			autoScroll: options.autoScroll === true,
 			videoMode,
 			rootCaptured: options.rootCaptured !== false,
 		});
+	if (typeof options.apiBodies === "number") {
+		result.apiBodies = options.apiBodies;
+	}
 	if (typeof progress.phase === "string" && progress.phase !== "") {
 		result.phase = progress.phase;
 	}
