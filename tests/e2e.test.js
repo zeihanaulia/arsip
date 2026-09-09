@@ -811,6 +811,17 @@ describe("x-adapter (real Chromium)", () => {
 
 		assert.ok(scrolled > 0, "inner container must be scrolled");
 		assert.equal(count, 2);
+		assert.ok(
+			(
+				await page.evaluate(() =>
+					globalThis.XScroller.expandAndScroll(document, {
+						maxBatches: 1,
+						batchDelayMs: 10,
+					}),
+				)
+			).scrollTarget.includes("timeline"),
+			"scroll target recorded for diagnosis",
+		);
 	});
 
 	it("waits out a slow chunk instead of quitting while idle", async (t) => {

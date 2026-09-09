@@ -22,6 +22,7 @@
  * @property {number} batches Batches executed.
  * @property {number} tweets Tweets loaded when stopping.
  * @property {number[]} history Tweet count after each batch (growth curve).
+ * @property {string} scrollTarget What was scrolled (tag#id/.class).
  * @property {string} stoppedWhy "idle" | "max-batches" | "max-tweets" | "cancelled".
  */
 
@@ -67,6 +68,7 @@ async function expandAndScroll(root, options = {}, onProgress) {
 			batches: 0,
 			tweets: 0,
 			history: [],
+			scrollTarget: describeScrollTarget(doc),
 			stoppedWhy: "idle",
 		};
 	let idleBatches = 0;
@@ -81,7 +83,7 @@ async function expandAndScroll(root, options = {}, onProgress) {
 			button.click();
 			stats.clicked += 1;
 		}
-		scrollOnce(doc);
+		await scrollStepped(doc);
 		await sleep(batchDelayMs);
 		stats.batches = batch + 1;
 		stats.tweets = countTweets(doc);
@@ -153,17 +155,55 @@ function findScrollContainer(doc) {
 }
 
 /**
+ * Short descriptor of the scroll target for diagnosis
+ * (which container the batches actually moved).
+ *
  * @param {ParentNode} doc
+ * @returns {string} e.g. "DIV#timeline", "HTML", "BODY".
  */
-function scrollOnce(doc) {
+function describeScrollTarget(doc) {
 	const target =
 		doc === document
 			? findScrollContainer(doc)
 			: doc instanceof Element
 				? doc
 				: null;
-	if (target) {
-		target.scrollTop = target.scrollHeight;
+	if (!target) {
+		return "none";
+	}
+	const tag = target.tagName || "?";
+	const id = target.getAttribute?.("id");
+	if (id) {
+		return `${tag}#${id}`;
+	}
+	const classes = (target.getAttribute?.("class") ?? "")
+		.split(/\s+/)
+		.filter(Boolean);
+	return classes.length > 0 ? `${tag}.${classes[0]}` : tag;
+}
+
+/**
+ * Scrolls in human-like steps instead of one jump to the bottom.
+ * Virtualized timelines observe sentinels progressively; an instant
+ * jump can add and recycle the sentinel before its observer fires,
+ * so no chunk ever loads.
+ *
+ * @param {ParentNode} doc
+ */
+async function scrollStepped(doc) {
+	const target =
+		doc === document
+			? findScrollContainer(doc)
+			: doc instanceof Element
+				? doc
+				: null;
+	if (!target) {
+		return;
+	}
+	const max = target.scrollHeight;
+	for (let step = 1; step <= 3; step += 1) {
+		target.scrollTop = (max * step) / 3;
+		await sleep(400);
 	}
 }
 
