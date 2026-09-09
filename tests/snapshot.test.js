@@ -410,6 +410,11 @@ describe("captureStats", () => {
 		assert.equal(captureStats({}, { apiBodies: 3 }).apiBodies, 3);
 		assert.equal("apiBodies" in captureStats({}, {}), false);
 	});
+
+	it("records how many API-only tweets were appended", () => {
+		assert.equal(captureStats({}, { apiAdded: 41 }).apiAdded, 41);
+		assert.equal("apiAdded" in captureStats({}, {}), false);
+	});
 });
 
 describe("filenameForSnapshot", () => {

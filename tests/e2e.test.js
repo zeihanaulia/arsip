@@ -804,12 +804,16 @@ describe("x-adapter (real Chromium)", () => {
 		const scrolled = await page.evaluate(
 			() => document.querySelector("#timeline")?.scrollTop ?? 0,
 		);
+		const outerScrolled = await page.evaluate(
+			() => document.querySelector("#outer")?.scrollTop ?? 0,
+		);
 		const count = await page.evaluate(
 			() =>
 				globalThis.XAdapter.scrapeRaw(document, location.href).tweets.length,
 		);
 
 		assert.ok(scrolled > 0, "inner container must be scrolled");
+		assert.ok(outerScrolled > 0, "outer container must be scrolled too");
 		assert.equal(count, 2);
 		assert.ok(
 			(

@@ -6,7 +6,8 @@
 	</head>
 	<body>
 		<main>
-			<div id="timeline" style="height: 200px; overflow: auto">
+			<div id="outer" style="height: 400px; overflow: auto">
+				<div id="timeline" style="height: 200px; overflow: auto">
 				<article data-testid="tweet">
 					<div data-testid="tweetText">First tweet</div>
 					<a href="/a/status/1"
@@ -15,6 +16,8 @@
 				</article>
 				<button id="more" type="button">Show more replies</button>
 				<div style="height: 1000px"></div>
+			</div>
+			<div style="height: 600px"></div>
 			</div>
 		</main>
 		<script>

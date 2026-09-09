@@ -131,46 +131,58 @@ async function mountLazyMedia(root, options = {}) {
 }
 
 /**
- * Finds what actually scrolls the timeline: the nearest ancestor of the
- * first tweet with real scrollable overflow. X virtualizes its timeline
- * in an inner container, so scrolling the document never triggers the
- * next chunk there. Falls back to the document scroller.
+ * Finds everything that scrolls the timeline: all ancestors of the
+ * first tweet with real scrollable overflow, deepest first, plus the
+ * document scroller when it scrolls too. X virtualizes its timeline
+ * in an inner container, and guessing a single container risks moving
+ * the wrong one while the sentinel never fires.
  *
  * @param {ParentNode} doc
- * @returns {Element} Scroll target (never the document itself).
+ * @returns {Element[]}
  */
-function findScrollContainer(doc) {
-	const first =
-		doc === document
-			? document.querySelector('article[data-testid="tweet"]')
-			: null;
-	let node = first?.parentElement ?? null;
-	while (node) {
-		if (node.scrollHeight - node.clientHeight > 50) {
-			return node;
+function findScrollContainers(doc) {
+	const /** @type {Element[]} */ targets = [];
+	if (doc === document) {
+		const first = document.querySelector('article[data-testid="tweet"]');
+		let node = first?.parentElement ?? null;
+		while (node) {
+			if (
+				node instanceof Element &&
+				node.scrollHeight - node.clientHeight > 50 &&
+				!targets.includes(node)
+			) {
+				targets.push(node);
+			}
+			node = node.parentElement;
 		}
-		node = node.parentElement;
+		const page = document.scrollingElement ?? document.body;
+		if (page.scrollHeight - page.clientHeight > 50 && !targets.includes(page)) {
+			targets.push(page);
+		}
+		return targets;
 	}
-	return document.scrollingElement ?? document.body;
+	if (doc instanceof Element) {
+		return [doc];
+	}
+	return [];
 }
 
 /**
- * Short descriptor of the scroll target for diagnosis
- * (which container the batches actually moved).
+ * Short descriptor list of the scroll targets for diagnosis
+ * (which containers the batches actually moved).
  *
  * @param {ParentNode} doc
- * @returns {string} e.g. "DIV#timeline", "HTML", "BODY".
+ * @returns {string} e.g. "DIV#timeline,DIV#outer".
  */
 function describeScrollTarget(doc) {
-	const target =
-		doc === document
-			? findScrollContainer(doc)
-			: doc instanceof Element
-				? doc
-				: null;
-	if (!target) {
-		return "none";
-	}
+	return findScrollContainers(doc).map(describeElement).join(",");
+}
+
+/**
+ * @param {Element} target
+ * @returns {string} e.g. "DIV#timeline" or "DIV.css-g5y9jx".
+ */
+function describeElement(target) {
 	const tag = target.tagName || "?";
 	const id = target.getAttribute?.("id");
 	if (id) {
@@ -183,27 +195,20 @@ function describeScrollTarget(doc) {
 }
 
 /**
- * Scrolls in human-like steps instead of one jump to the bottom.
- * Virtualized timelines observe sentinels progressively; an instant
- * jump can add and recycle the sentinel before its observer fires,
- * so no chunk ever loads.
+ * Scrolls every scrollable ancestor in human-like steps instead of one
+ * jump to the bottom. Virtualized timelines observe sentinels
+ * progressively; an instant jump can add and recycle the sentinel
+ * before its observer fires, so no chunk ever loads.
  *
  * @param {ParentNode} doc
  */
 async function scrollStepped(doc) {
-	const target =
-		doc === document
-			? findScrollContainer(doc)
-			: doc instanceof Element
-				? doc
-				: null;
-	if (!target) {
-		return;
-	}
-	const max = target.scrollHeight;
-	for (let step = 1; step <= 3; step += 1) {
-		target.scrollTop = (max * step) / 3;
-		await sleep(400);
+	for (const target of findScrollContainers(doc)) {
+		const max = target.scrollHeight;
+		for (let step = 1; step <= 2; step += 1) {
+			target.scrollTop = (max * step) / 2;
+			await sleep(300);
+		}
 	}
 }
 
