@@ -44,7 +44,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Phase 4: UX + QA packaging
 
-- [ ] Task 8: Popup UI final (preset + opsi + progress + error)
+- [x] Task 8: Popup UI final (preset + opsi + progress + error)
 - [ ] Task 9: Hardening + packaging + uji ChatGPT E2E
 
 ## Checkpoint: Complete
