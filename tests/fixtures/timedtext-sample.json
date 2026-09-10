@@ -1,0 +1,206 @@
+{
+	"_note": "Verbatim excerpts from network-log-2026-09-10 (1).json (Endgame watch session). timedtext events and player response come from different responses in the same log; shapes are identical.",
+	"timedtext": {
+		"wireMagic": "pb3",
+		"events": [
+			{
+				"tStartMs": 0,
+				"id": 1,
+				"wpWinPosId": 1,
+				"wsWinStyleId": 1
+			},
+			{
+				"tStartMs": 240,
+				"dDurationMs": 7519,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "Ketika saya ke Austin itu ada culture\ngap sebenarnya, Pak.",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 5759,
+				"dDurationMs": 7081,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "Secara filosofis ya, ya, Pak, ya.\nDeruukiwa Utareru. Kalau ada paku yang",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 10160,
+				"dDurationMs": 4479,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "menonjol itu kan di palu supaya rata.\nMenarik.",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 13400,
+				"dDurationMs": 6560,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "Kita bisa besar karena kita\nbareng-bareng.",
+						"acAsrConf": 0,
+						"isSpeakerChange": 1
+					}
+				]
+			},
+			{
+				"tStartMs": 17119,
+				"dDurationMs": 7201,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "Di Amerika beda Pak Dia ekstrem.\nHow about you? What do you think?",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 22680,
+				"dDurationMs": 5480,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "Meeting gitu kan di Jepang itu biasa\nkita ya take turns lah, Pak, untuk",
+						"acAsrConf": 0,
+						"isSpeakerChange": 1
+					}
+				]
+			},
+			{
+				"tStartMs": 26199,
+				"dDurationMs": 7081,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "ngomong. Ayo, silakan silakan. Menurut\nAnda seperti apa? Kalau drumnya kan",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 30130,
+				"dDurationMs": 8350,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "[tertawa]"
+					},
+					{
+						"utf8": " wow free for all pak\nsiapa yang mau ngomong langsung ngomong",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 35280,
+				"dDurationMs": 3200,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "ya kan",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 39160,
+				"dDurationMs": 7480,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "di sistem komputer compute is very cheap\nmenambahkan, mengurangi atau perkalian",
+						"acAsrConf": 0,
+						"isSpeakerChange": 1
+					}
+				]
+			},
+			{
+				"tStartMs": 44480,
+				"dDurationMs": 9320,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "itu very cheap. Yang mahal yang\nmengkonsumsi energi 200 kali dari",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 49079,
+				"dDurationMs": 8280,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "compute itu adalah pemindahan data, Pak.\nKenapa ini relevan? Ini konsquensinya",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 55600,
+				"dDurationMs": 5840,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "kalau misalnya kita ada battery power\ndevice, siapa yang mau pakai kacamata",
+						"acAsrConf": 0
+					}
+				]
+			},
+			{
+				"tStartMs": 30130,
+				"dDurationMs": 8350,
+				"wWinId": 1,
+				"segs": [
+					{
+						"utf8": "[tertawa]"
+					},
+					{
+						"utf8": " wow free for all pak\nsiapa yang mau ngomong langsung ngomong",
+						"acAsrConf": 0
+					}
+				]
+			}
+		]
+	},
+	"captionTracks": [
+		{
+			"baseUrl": "https://www.youtube.com/api/timedtext?v=X2IfG40_4-t&caps=uAi&opi=449224003&xoaf=8&hl=ik&ip=73.25.70.82&ipbits=8&expire=5789115952&sparams=ip,ipbits,expire,v,caps,opi,xoaf&signature=73.25.70.82&key=uAi&lang=DBj6p",
+			"name": {
+				"simpleText": "u6J0GlJDMH0T2UYN13D"
+			},
+			"vssId": ".en-US",
+			"languageCode": "en-US",
+			"isTranslatable": true,
+			"trackName": ""
+		},
+		{
+			"baseUrl": "https://www.youtube.com/api/timedtext?v=X2IfG40_4-t&caps=uAi&opi=449224003&xoaf=8&hl=ik&ip=73.25.70.82&ipbits=8&expire=5789115952&sparams=ip,ipbits,expire,v,caps,opi,xoaf&signature=73.25.70.82&key=uAi&kind=uAi&lang=ik",
+			"name": {
+				"simpleText": "qSqhY4YwZn2I5dB"
+			},
+			"vssId": "a.it",
+			"languageCode": "it",
+			"kind": "asr",
+			"isTranslatable": true,
+			"trackName": ""
+		}
+	],
+	"videoDetails": {
+		"videoId": "cQWMhMNYllQ",
+		"title": "7uwRy67WVi",
+		"lengthSeconds": "1155",
+		"author": "TpFGILdxnEQrD"
+	}
+}

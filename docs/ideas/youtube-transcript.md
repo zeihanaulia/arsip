@@ -6,11 +6,14 @@ siap upload ke ChatGPT beserta link-nya — tanpa backend dan tanpa fetch ke API
 
 ## Recommended Direction
 Adapter YouTube ketiga mengikuti pola O'Reilly: scrape dari tab aktif, arsip satu halaman,
-export minimal buat LLM. Jalur utama: buka panel "Show transcript" secara programmatic,
-baca segmen DOM (timestamp + teks apa adanya), bungkus jadi `video.md` + `video.json`
-dalam `<videoid>.zip`. Tanpa `media.js` (nggak ada gambar), tanpa scroller, tanpa xlsx —
-stack content paling kurus sejauh ini. Timestamp per segmen dipertahankan karena prompt
-ChatGPT merujuk menit pembahasan.
+export minimal buat LLM. Jalur utama: **B — parse `timedtext` json3 + `captionTracks` dari
+buffer tangkapan network** (terbukti ketangkap di log asli: 1196 events + timestamp, pola
+persis X Task 7). Tanpa fetch tambahan, tanpa klik UI. Bungkus jadi `video.md` + `video.json`
+dalam `<videoid>.zip`. Tanpa `media.js` (nggak ada gambar), tanpa scroller, tanpa xlsx.
+Timestamp per segmen dipertahankan karena prompt ChatGPT merujuk menit pembahasan.
+
+> Keputusan 2026-09-11: pindah A→B setelah bedah network log asli. Jalur A (panel DOM)
+> turun jadi fallback tak-dibangun.
 
 ## Key Assumptions to Validate
 - [ ] Panel transcript bisa dibuka programmatic (klik ...more → Show transcript) dan
