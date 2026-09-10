@@ -29,10 +29,10 @@ const PRESET_FORMATS = [
 let polling = false;
 
 const UNSUPPORTED_SITE_MESSAGE =
-	"Arsip V1 hanya mendukung thread X — dukungan situs lain nyusul.";
+	"Arsip hanya mendukung thread X dan video YouTube — buka salah satunya dulu.";
 
 pingButton?.addEventListener("click", async () => {
-	if (!(await activeThreadTab())) {
+	if (!(await activeSupportedTab())) {
 		setStatus(UNSUPPORTED_SITE_MESSAGE);
 		return;
 	}
@@ -41,7 +41,7 @@ pingButton?.addEventListener("click", async () => {
 });
 
 downloadButton?.addEventListener("click", async () => {
-	if (!(await activeThreadTab())) {
+	if (!(await activeSupportedTab())) {
 		setStatus(UNSUPPORTED_SITE_MESSAGE);
 		return;
 	}
@@ -103,6 +103,39 @@ async function activeThreadTab() {
 }
 
 /**
+ * The active tab only when it is a YouTube watch page. Detection lives
+ * in the registry — the popup never hardcodes hosts beyond X.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function activeVideoTab() {
+	try {
+		const [tab] = await chrome.tabs.query({
+			active: true,
+			currentWindow: true,
+		});
+		if (tab?.id === undefined) {
+			return false;
+		}
+		return detectAdapter(tab.url ?? "") === "youtube";
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Either supported surface: thread (X) or transcript (YouTube).
+ *
+ * @returns {Promise<boolean>}
+ */
+async function activeSupportedTab() {
+	if (await activeThreadTab()) {
+		return true;
+	}
+	return activeVideoTab();
+}
+
+/**
  * Network-log capture runs everywhere our hook is injected (X today,
  * YouTube for transcript field work) while full download support stays
  * per-site. Detection lives in the registry — the popup never hardcodes
@@ -149,12 +182,14 @@ async function downloadVisibleThread() {
 	const skipPromoted =
 		!(skipPromotedBox instanceof HTMLInputElement) || skipPromotedBox.checked;
 	const { preset, formats } = readPreset();
+	const site = (await activeVideoTab()) ? "youtube" : "x";
 	setButtons({ downloading: true });
-	setStatus(autoScroll ? "expanding thread…" : "scraping visible tweets…");
+	setStatus(startStatus(site, autoScroll));
 	try {
 		await withTimeout(
 			chrome.runtime.sendMessage(
 				createMessage(MESSAGE_TYPES.SCRAPE_START, {
+					site,
 					autoScroll,
 					videoMode,
 					preset,
@@ -293,6 +328,10 @@ function renderResult(result) {
 		return;
 	}
 	const payload = result.payload ?? {};
+	if (payload.kind === "video") {
+		setStatus(`downloaded ${payload.filename} (${payload.count} segments).`);
+		return;
+	}
 	const media = /** @type {{ downloaded?: unknown }} */ (payload.media ?? {});
 	const mediaText =
 		typeof media.downloaded === "number" ? `, ${media.downloaded} media` : "";
@@ -307,6 +346,21 @@ function renderResult(result) {
 	setStatus(
 		`downloaded ${payload.filename} (${payload.count} tweets${mediaText}, stopped: ${payload.stoppedWhy ?? "unknown"}).${rootHint}${scrollerHint}`,
 	);
+}
+
+/**
+ * What the status line says while the job starts. One place so the
+ * per-site wording stays consistent.
+ *
+ * @param {string} site "youtube" or "x".
+ * @param {boolean} autoScroll
+ * @returns {string}
+ */
+function startStatus(site, autoScroll) {
+	if (site === "youtube") {
+		return "scraping captions…";
+	}
+	return autoScroll ? "expanding thread…" : "scraping visible tweets…";
 }
 
 /**
@@ -390,9 +444,7 @@ async function pingContentScript() {
 		const caps = /** @type {Record<string, unknown>} */ (
 			reply.payload.caps ?? {}
 		);
-		const missing = ["hook", "scroller", "media", "zip", "sheet"].filter(
-			(key) => caps[key] !== true,
-		);
+		const missing = expectedCaps(tab.url).filter((key) => caps[key] !== true);
 		if (missing.length === 0) {
 			return "connected: true";
 		}
@@ -403,3 +455,38 @@ async function pingContentScript() {
 			: "content script not reachable on this page";
 	}
 }
+
+/**
+ * Capabilities that must be present per surface. YouTube needs only the
+ * hook (capture buffer) and the zip builder — no scroller, no media
+ * fetcher, no sheet writer. A video tab missing those is healthy, not stale.
+ *
+ * @param {string | undefined} url
+ * @returns {string[]}
+ */
+function expectedCaps(url) {
+	if (detectAdapter(url ?? "") === "youtube") {
+		return ["hook", "zip"];
+	}
+	return ["hook", "scroller", "media", "zip", "sheet"];
+}
+
+/**
+ * Labels the download button for the current surface so the user knows
+ * what they are about to archive. Best-effort: failures keep the
+ * default thread wording.
+ */
+async function initSiteMode() {
+	try {
+		if (await activeVideoTab()) {
+			if (downloadButton instanceof HTMLButtonElement) {
+				downloadButton.textContent = "Download transcript";
+			}
+			setStatus("Open a YouTube video, then download.");
+		}
+	} catch {
+		// Default labels stand.
+	}
+}
+
+void initSiteMode();

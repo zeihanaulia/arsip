@@ -349,12 +349,150 @@ describe("popup UI (stubbed chrome APIs)", () => {
 				/** @type {{ type?: string }} */ (message)?.type === "SCRAPE_START",
 		);
 		assert.deepEqual(/** @type {{ payload?: unknown }} */ (started)?.payload, {
+			site: "x",
 			autoScroll: false,
 			videoMode: "separate",
 			preset: "custom",
 			formats: ["thread.md", "thread.csv"],
 			skipPromoted: true,
 		});
+		assert.deepEqual(problems, []);
+	});
+
+	it("downloads a transcript on YouTube and sends site routing", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			/** @type {unknown[]} */
+			const sent = [];
+			Object.assign(globalThis, {
+				__sent: sent,
+				chrome: {
+					tabs: {
+						query: async () => [
+							{ id: 9, url: "https://www.youtube.com/watch?v=cQWMhMNYllQ" },
+						],
+					},
+					runtime: {
+						sendMessage: async (/** @type {unknown} */ message) => {
+							sent.push(message);
+							const type = /** @type {{ type?: string }} */ (message)?.type;
+							if (type === "SCRAPE_STATUS") {
+								return {
+									type: "SCRAPE_PROGRESS",
+									payload: {
+										phase: "done",
+										result: {
+											type: "SCRAPE_DONE",
+											payload: {
+												kind: "video",
+												filename: "cQWMhMNYllQ.zip",
+												count: 42,
+											},
+										},
+									},
+								};
+							}
+							return {
+								type: "SCRAPE_PROGRESS",
+								payload: { phase: "started" },
+							};
+						},
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		assert.equal(await page.textContent("#download"), "Download transcript");
+		await page.click("#download");
+		await page.waitForFunction(
+			() =>
+				document
+					.querySelector("#status")
+					?.textContent?.includes("cQWMhMNYllQ.zip"),
+			{ timeout: 15_000 },
+		);
+		const status = await page.textContent("#status");
+		assert.match(status ?? "", /42 segments/);
+
+		const sent = await page.evaluate(
+			() =>
+				/** @type {unknown[]} */ (
+					/** @type {{ __sent?: unknown }} */ (globalThis).__sent ?? []
+				),
+		);
+		const started = sent.find(
+			(message) =>
+				/** @type {{ type?: string }} */ (message)?.type === "SCRAPE_START",
+		);
+		assert.equal(
+			/** @type {{ payload?: { site?: string } }} */ (started)?.payload?.site,
+			"youtube",
+		);
+		assert.deepEqual(problems, []);
+	});
+
+	it("reports a YouTube tab healthy without the X-only caps", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			Object.assign(globalThis, {
+				chrome: {
+					tabs: {
+						query: async () => [
+							{ id: 9, url: "https://www.youtube.com/watch?v=cQWMhMNYllQ" },
+						],
+						sendMessage: async () => ({
+							type: "PING",
+							payload: {
+								connected: true,
+								caps: { hook: true, zip: true },
+							},
+						}),
+					},
+					runtime: {
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.click("#ping");
+		await page.waitForFunction(
+			() =>
+				document.querySelector("#status")?.textContent?.includes("connected:"),
+			{ timeout: 15_000 },
+		);
+
+		assert.equal(await page.textContent("#status"), "connected: true");
 		assert.deepEqual(problems, []);
 	});
 });

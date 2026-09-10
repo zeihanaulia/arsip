@@ -74,7 +74,8 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [x] Task 14: Parser YouTube (youtube-graphql.js) — timedtext jadi VideoPayload
 - [x] Task 15: Exporter video.md + video.json (LLM-ready)
 - [x] Task 16: Wiring tab — registry + manifest + content route + background path
-- [ ] Task 17: Popup + tests + uji manual video asli
+- [x] Task 17: Popup + tests (manual video asli + probe ChatGPT: user)
+- [ ] Checkpoint: Complete (Phase 6) — manual + review human
 
 ## Checkpoint: Complete (Phase 6)
 

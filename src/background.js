@@ -190,7 +190,8 @@ async function downloadVideo() {
 		});
 	}
 	const payload = /** @type {Record<string, unknown>} */ (reply.payload);
-	const sourceUrl = typeof payload.sourceUrl === "string" ? payload.sourceUrl : "";
+	const sourceUrl =
+		typeof payload.sourceUrl === "string" ? payload.sourceUrl : "";
 	const video = assembleVideoPayload(
 		payload.timedBodies,
 		payload.playerBodies,
@@ -239,7 +240,6 @@ async function downloadVideo() {
 function safeVideoId(videoId) {
 	const safe = String(videoId ?? "").replace(/[^A-Za-z0-9-_]+/g, "-");
 	return safe === "" ? "video" : safe;
-}
 }
 
 /**
