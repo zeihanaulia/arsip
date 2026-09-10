@@ -46,10 +46,21 @@ Video yang tidak bisa diambil bytes-nya (stream/blob player) dicatat jujur di ma
 
 ## Develop
 
-Prasyarat: Node 24+.
+Prasyarat: Node 24+, Chrome terbaru.
+
+Instalasi (load unpacked):
 
 ```bash
+git clone git@github.com:zeihanaulia/arsip.git
+cd arsip
 npm install
+```
+
+1. Buka `chrome://extensions`, nyalakan **Developer mode**
+2. Klik **Load unpacked** → pilih folder repo
+3. Buka thread X → klik ikon Arsip → Check connection harus `connected: true`
+
+```bash
 npm run verify   # quality (Biome + tsc) + tests
 ```
 
