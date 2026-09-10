@@ -86,4 +86,20 @@ describe("manifest", () => {
 		assert.equal(hook?.world, "MAIN");
 		assert.equal(hook?.run_at, "document_start");
 	});
+
+	it("gives every BUILD_ZIP-capable page the zip helpers (media.js)", () => {
+		const entries = /** @type {{ js?: string[], world?: string }[]} */ (
+			manifest.content_scripts ?? []
+		);
+		const isolated = entries.filter((entry) => entry.world !== "MAIN");
+
+		for (const entry of isolated) {
+			if ((entry.js ?? []).some((file) => file.includes("content.js"))) {
+				assert.ok(
+					(entry.js ?? []).some((file) => file.includes("media.js")),
+					"content.js needs XMedia.buildZip/bytesToBase64 from media.js in the same stack",
+				);
+			}
+		}
+	});
 });

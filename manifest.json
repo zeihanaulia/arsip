@@ -55,7 +55,7 @@
 				"https://www.youtube.com/*",
 				"https://m.youtube.com/*"
 			],
-			"js": ["vendor/jszip.min.js", "src/content.js"]
+			"js": ["vendor/jszip.min.js", "src/media.js", "src/content.js"]
 		}
 	]
 }
