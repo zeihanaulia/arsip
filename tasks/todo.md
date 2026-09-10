@@ -39,8 +39,8 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Phase 3: Mekanisme utama
 
-- [ ] Task 7: Network response capture via MAIN-world hook
-- [ ] Blocker eksternal: 1 file respons GraphQL asli via DevTools
+- [x] Task 7: Network response capture via MAIN-world hook
+- [x] Blocker eksternal: network log asli dari user (disediakan, parser dilatih darinya)
 
 ## Phase 4: UX + QA packaging
 
