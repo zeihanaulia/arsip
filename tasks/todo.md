@@ -53,6 +53,19 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [x] ZIP final siap upload ke ChatGPT tanpa missing mayor
 - [x] Siap review; belum publish ke Web Store (out of scope v1)
 
+## Phase 5: V2 situs generik (O'Reilly, arsip-halaman)
+
+- [ ] Task 10: Kontrak SiteAdapter + registrasi
+- [ ] Task 11: Adapter O'Reilly
+- [ ] Blocker eksternal: 1 file HTML halaman O'Reilly tersimpan
+- [ ] Task 12: Manifest + popup routing + ZIP O'Reilly
+
+## Checkpoint: V2-OReilly
+
+- [ ] Chapter O'Reilly terarsip end-to-end + diskusi ChatGPT
+- [ ] Jalur X tidak regresi
+- [ ] Review human sebelum adapter situs ketiga
+
 ## Backlog (post-V1)
 
-- [ ] B2: Dukungan situs generik (detail di `tasks/plan.md`)
+(none)

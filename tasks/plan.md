@@ -341,29 +341,75 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ## Backlog (post-V1, belum di-commit ke task)
 
-(tidak ada — B1 network interception sudah dipromosikan jadi Task 7)
+(tidak ada — semua dipromosikan)
 
-### B2: Dukungan situs generik (visi Arsip)
+## Phase 5: V2 situs generik (target pertama: O'Reilly, scope arsip-halaman)
 
-**Konteks:** Popup sekarang menolak situs non-X secara eksplisit
-(`activeThreadTab`). Visi repo adalah downloader generik: buka halaman
-apa saja → arsip offline + konteks LLM. V1 mengunci X dulu agar mekanik
-inti (capture, merge, exporter, ZIP) terbukti sebelum digeneralisasi.
+Keputusan terkunci (2026-09-10): situs pertama O'Reilly spesifik
+(bukan readability generik), scope arsip halaman saja — HTML/MD +
+gambar lokal + ZIP, tanpa CSV/XLSX/thread-model.
 
-**Arah desain (draf, belum diputus):**
-- Kontrak `SiteAdapter`: `detect(url, document)`, `scrapeList()`,
-  `scrollMore()`, `mediaInventory()` — `x-adapter.js` jadi implementasi
-  pertama; adapter generik (readability-style: artikel + gambar) kedua
-- Manifest `matches` meluas per adapter yang terdaftar; permission
-  tetap minimal per-match, tanpa `<all_urls>` blanket
-- Hook network tetap X-spesifik (opt-in per adapter); generic path
-  murni DOM + fetch media secontext
-- Popup: pesan unsupported berubah jadi pemilih adapter / fallback
-  generic tornado
+## Task 10: Kontrak SiteAdapter + registrasi (X jadi implementasi pertama)
 
-**Kriteria selesai (draf):** 1 situs non-X (mis. artikel blog) terarsip
-end-to-end (HTML/MD + gambar lokal + ZIP) dengan test E2E fixture-nya
-sendiri; tidak ada regresi jalur X (seluruh suite hijau).
+**Description:** Definisikan kontrak adapter tanpa mengubah perilaku X:
+`detect(url, document)`, `scrapeArticles()`, `scrollMore()`,
+`mediaInventory()`. Bungkus `x-adapter.js` agar memenuhi kontrak;
+seluruh suite harus tetap hijau (refactor murni).
+
+**Acceptance criteria:**
+- [ ] Ada `src/sites/registry.js` (atau setara): daftar adapter +
+  fungsi `detectAdapter(url, document)` yang memilih tepat satu
+- [ ] `x-adapter.js` memenuhi kontrak tanpa berubah perilaku
+  (seluruh test Task 1-9 hijau tanpa modifikasi ekspektasi)
+- [ ] Aturan AGENTS.md diperbarui: query DOM situs HANYA di file
+  adaptornya masing-masing
+
+**Estimated scope:** Small-Medium (2-3 files)
+
+## Task 11: Adapter O'Reilly (article + gambar)
+
+**Description:** Adapter `learning.oreilly.com`: deteksi halaman chapter,
+scrape judul + body + gambar konten, scroll per section bila perlu.
+Fixture dari HTML asli yang disimpan user (seperti pola markup video).
+
+**Acceptance criteria:**
+- [ ] Fixture `tests/fixtures/oreilly-chapter.html` dari halaman asli
+  (anonymisasi bila perlu) + E2E: judul, paragraf berurutan, gambar
+  ter-inventory — hijau headed
+- [ ] Tidak ada selector X yang bocor ke adapter ini (dan sebaliknya)
+
+**Dependencies:** Task 10; **blocker eksternal**: 1 file HTML halaman
+O'Reilly tersimpan (Ctrl+S, webpage HTML only) dari user
+
+**Estimated scope:** Medium (2-3 files)
+
+## Task 12: Manifest + popup routing + ZIP untuk O'Reilly
+
+**Description:** Daftarkan match O'Reilly di manifest (tanpa
+`<all_urls>` blanket), popup deteksi adapter dan ganti pesan
+unsupported jadi alur download normal, ZIP isi HTML/MD/gambar pakai
+pipeline yang sama (tanpa CSV/XLSX/thread-model).
+
+**Acceptance criteria:**
+- [ ] Di halaman O'Reilly: Check connection `connected: true`,
+  Download menghasilkan ZIP (HTML/MD/gambar lokal, bisa dibuka offline)
+- [ ] Di situs lain yang belum didukung: pesan unsupported tetap eksplisit
+- [ ] Jalur X tidak regresi (seluruh suite hijau + 1 download ulang
+  thread nyata)
+
+**Verification:**
+- [ ] Manual check 1 chapter O'Reilly panjang + gambar: unzip, buka
+  HTML offline, upload MD ke ChatGPT dan ajak diskusi
+
+**Dependencies:** Task 11
+
+**Estimated scope:** Medium (3-4 files)
+
+### Checkpoint: V2-OReilly
+
+- [ ] Chapter O'Reilly terarsip end-to-end dan bisa didiskusikan di ChatGPT
+- [ ] Jalur X tidak regresi
+- [ ] Review human sebelum adapter situs ketiga
 
 ## Risks and Mitigations
 
