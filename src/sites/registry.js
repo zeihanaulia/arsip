@@ -12,7 +12,7 @@
 
 /**
  * @typedef {Object} SiteAdapterEntry
- * @property {string} id "x" | "oreilly".
+ * @property {string} id "x" | "oreilly" | "youtube".
  * @property {string[]} hosts Suffix-matched hostnames.
  * @property {string[]} scripts Classic files, load order = array order.
  * @property {string} global Global object the scripts expose.
@@ -38,6 +38,12 @@ export const SITE_ADAPTERS = [
 		hosts: ["learning.oreilly.com"],
 		scripts: ["src/hook-main.js", "src/oreilly-adapter.js", "src/content.js"],
 		global: "XOReilly",
+	},
+	{
+		id: "youtube",
+		hosts: ["youtube.com"],
+		scripts: ["src/hook-main.js", "src/content.js"],
+		global: "XYoutube",
 	},
 ];
 

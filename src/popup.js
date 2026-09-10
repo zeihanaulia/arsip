@@ -1,5 +1,6 @@
 /** Popup: connection check plus Task 2-3 JSON download with polling. */
 import { createMessage, isMessage, MESSAGE_TYPES } from "./messaging.js";
+import { detectAdapter } from "./sites/registry.js";
 
 const POLL_INTERVAL_MS = 600;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -54,7 +55,7 @@ presetBox?.addEventListener("change", () => {
 });
 
 netlogButton?.addEventListener("click", async () => {
-	if (!(await activeThreadTab())) {
+	if (!(await activeCaptureTab())) {
 		setStatus(UNSUPPORTED_SITE_MESSAGE);
 		return;
 	}
@@ -96,6 +97,32 @@ async function activeThreadTab() {
 				host === "twitter.com" ||
 				host.endsWith(".twitter.com"))
 		);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Network-log capture runs everywhere our hook is injected (X today,
+ * YouTube for transcript field work) while full download support stays
+ * per-site. Detection lives in the registry — the popup never hardcodes
+ * hosts beyond X.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function activeCaptureTab() {
+	if (await activeThreadTab()) {
+		return true;
+	}
+	try {
+		const [tab] = await chrome.tabs.query({
+			active: true,
+			currentWindow: true,
+		});
+		if (tab?.id === undefined) {
+			return false;
+		}
+		return detectAdapter(tab.url ?? "") !== null;
 	} catch {
 		return false;
 	}

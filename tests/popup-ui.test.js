@@ -170,6 +170,57 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		assert.deepEqual(problems, []);
 	});
 
+	it("allows the network log on YouTube while downloads stay X-only", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			Object.assign(globalThis, {
+				chrome: {
+					tabs: {
+						query: async () => [
+							{ id: 9, url: "https://www.youtube.com/watch?v=abc123DEF45" },
+						],
+					},
+					runtime: {
+						sendMessage: async () => ({
+							type: "SCRAPE_DONE",
+							payload: { filename: "network-log.json", entries: 4 },
+						}),
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.evaluate(() => {
+			document.querySelector("#advanced")?.setAttribute("open", "");
+		});
+		await page.click("#netlog");
+		await page.waitForFunction(
+			() =>
+				document
+					.querySelector("#status")
+					?.textContent?.includes("network-log.json"),
+			{ timeout: 15_000 },
+		);
+		const status = await page.textContent("#status");
+		assert.match(status ?? "", /4 entries/);
+		assert.deepEqual(problems, []);
+	});
+
 	it("refuses non-X sites with an explicit message instead of a channel error", async (t) => {
 		const browser = await chromium.launch({
 			headless: !headed,

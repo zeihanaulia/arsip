@@ -17,6 +17,17 @@ describe("detectAdapter", () => {
 		);
 	});
 
+	it("routes YouTube watch pages to the youtube adapter", () => {
+		assert.equal(
+			detectAdapter("https://www.youtube.com/watch?v=abc123DEF45"),
+			"youtube",
+		);
+		assert.equal(
+			detectAdapter("https://m.youtube.com/watch?v=abc123DEF45"),
+			"youtube",
+		);
+	});
+
 	it("returns null for unregistered sites", () => {
 		assert.equal(detectAdapter("https://example.com/page"), null);
 		assert.equal(detectAdapter("not a url"), null);
