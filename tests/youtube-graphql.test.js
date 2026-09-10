@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+	assembleVideoPayload,
 	extractSegments,
 	extractTracks,
 	extractVideoMeta,
@@ -102,5 +103,49 @@ describe("extractVideoMeta", () => {
 			durationSeconds: 0,
 			author: "",
 		});
+	});
+});
+
+describe("assembleVideoPayload", () => {
+	const timedBody = JSON.stringify(fixture.timedtext);
+	const playerBody = JSON.stringify({
+		videoDetails: fixture.videoDetails,
+		captions: {
+			playerCaptionsTracklistRenderer: {
+				captionTracks: fixture.captionTracks,
+			},
+		},
+	});
+	const url = "https://www.youtube.com/watch?v=cQWMhMNYllQ";
+
+	it("assembles title, segments, and track language from both bodies", () => {
+		const video = assembleVideoPayload([timedBody], [playerBody], url);
+
+		assert.equal(video.videoId, "cQWMhMNYllQ");
+		assert.equal(video.title, "7uwRy67WVi");
+		assert.equal(video.url, url);
+		assert.equal(video.durationSeconds, 1155);
+		assert.equal(video.lang, "en-US");
+		assert.ok(video.segments.length > 5);
+		assert.equal(video.segments[0].t, "00:00");
+	});
+
+	it("prefers the videoId from the page URL over the player body", () => {
+		const video = assembleVideoPayload(
+			[timedBody],
+			[playerBody],
+			"https://www.youtube.com/watch?v=AAAAAAAAAAA",
+		);
+
+		assert.equal(video.videoId, "AAAAAAAAAAA");
+		assert.equal(video.url, "https://www.youtube.com/watch?v=AAAAAAAAAAA");
+	});
+
+	it("stays honest when bodies are missing or empty", () => {
+		const video = assembleVideoPayload([], [], url);
+
+		assert.deepEqual(video.segments, []);
+		assert.equal(video.title, "");
+		assert.equal(video.videoId, "cQWMhMNYllQ");
 	});
 });

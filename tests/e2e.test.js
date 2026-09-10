@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -1089,5 +1089,94 @@ describe("x-adapter (real Chromium)", () => {
 		);
 
 		assert.equal(parsed, 1200);
+	});
+});
+
+describe("youtube video flow (real Chromium)", () => {
+	it("forwards captured timedtext and player bodies on site youtube", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const timedBody = JSON.stringify(
+			JSON.parse(
+				readFileSync(
+					join(root, "tests/fixtures/timedtext-sample.json"),
+					"utf8",
+				),
+			).timedtext,
+		);
+		const playerBody = JSON.stringify({
+			videoDetails: { videoId: "cQWMhMNYllQ", title: "T" },
+		});
+		const response = await page.evaluate(
+			([timed, player]) => {
+				window.dispatchEvent(
+					new CustomEvent("arsip:net", {
+						detail: {
+							url: "https://www.youtube.com/api/timedtext?v=cQWMhMNYllQ",
+							status: 200,
+							mime: "application/json",
+							body: timed,
+						},
+					}),
+				);
+				window.dispatchEvent(
+					new CustomEvent("arsip:net", {
+						detail: {
+							url: "https://www.youtube.com/youtubei/v1/player?key=x",
+							status: 200,
+							mime: "application/json",
+							body: player,
+						},
+					}),
+				);
+				const holder =
+					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+						globalThis
+					);
+				const listener = holder.__listeners?.[0];
+				if (!listener) {
+					throw new Error("content script did not register a listener");
+				}
+				return new Promise((resolve) => {
+					listener(
+						{ type: "SCRAPE_START", payload: { site: "youtube" } },
+						{},
+						resolve,
+					);
+				});
+			},
+			[timedBody, playerBody],
+		);
+		const payload =
+			/** @type {{ type?: string, payload?: { timedBodies?: string[], playerBodies?: string[], sourceUrl?: string } }} */ (
+				response
+			);
+
+		assert.equal(payload.type, "SCRAPE_DONE");
+		assert.equal(payload.payload?.timedBodies?.length, 1);
+		assert.equal(payload.payload?.playerBodies?.length, 1);
+		assert.ok((payload.payload?.sourceUrl ?? "").length > 0);
 	});
 });

@@ -117,6 +117,56 @@ function trimNetLog() {
 let cancelRequested = false;
 
 /**
+ * @param {{ payload?: unknown }} raw
+ * @returns {string} "youtube" when explicitly requested, else "x".
+ * Routing uses the explicit payload.site so host detection stays in
+ * the registry; the default preserves X behavior byte-for-byte.
+ */
+function readSiteId(raw) {
+	const payload = /** @type {{ site?: unknown }} */ (raw.payload ?? {});
+	return payload.site === "youtube" ? "youtube" : "x";
+}
+
+/**
+ * YouTube path (jalur B): no parse here, no fetch — the background owns
+ * youtube-graphql.js (ESM) while this classic script only forwards the
+ * captured buffers, newest first, capped so the channel survives a
+ * 250KB timedtext body or two.
+ *
+ * @returns {{ type: string, payload: Record<string, unknown> }}
+ */
+function scrapeVideoBodies() {
+	/** @type {string[]} */
+	const timedBodies = [];
+	/** @type {string[]} */
+	const playerBodies = [];
+	for (let index = netLog.length - 1; index >= 0; index -= 1) {
+		const entry = netLog[index];
+		if (typeof entry.url !== "string" || typeof entry.body !== "string") {
+			continue;
+		}
+		if (
+			entry.url.includes("/api/timedtext") &&
+			entry.body !== "" &&
+			timedBodies.length < 3
+		) {
+			timedBodies.push(entry.body);
+		} else if (
+			entry.url.includes("/youtubei/v1/player") &&
+			entry.body !== "" &&
+			playerBodies.length < 3
+		) {
+			playerBodies.push(entry.body);
+		}
+	}
+	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
+		timedBodies,
+		playerBodies,
+		sourceUrl: location.href,
+	});
+}
+
+/**
  * @param {unknown} raw
  * @returns {{ autoScroll: boolean, videoMode: string, skipPromoted: boolean }}
  */
@@ -604,6 +654,10 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 		return false;
 	}
 	if (raw.type === MESSAGE_TYPES.SCRAPE_START) {
+		if (readSiteId(raw) === "youtube") {
+			respond(scrapeVideoBodies());
+			return false;
+		}
 		const options = readScrapeOptions(raw);
 		runScrape(options.autoScroll, options.videoMode, options.skipPromoted).then(
 			respond,

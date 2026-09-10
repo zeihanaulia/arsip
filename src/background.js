@@ -11,6 +11,7 @@ import {
 	renderMediaList,
 	renderThreadHtml,
 	renderThreadMarkdown,
+	renderVideoMarkdown,
 } from "./export-html.js";
 import {
 	snapshotToCsv,
@@ -34,6 +35,7 @@ import {
 	validateSnapshot,
 } from "./snapshot.js";
 import { extractRawTweets, mergeApiIntoSnapshot } from "./x-graphql.js";
+import { assembleVideoPayload } from "./youtube-graphql.js";
 
 /** @type {Record<string, unknown>} */
 let lastProgress = { phase: "idle", tweets: 0, batches: 0 };
@@ -83,7 +85,7 @@ chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
 
 /**
  * @param {import("./messaging.js").Message} message
- * @returns {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean }}
+ * @returns {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean, site: string }}
  */
 function readScrapeOptions(message) {
 	const payload = /** @type {Record<string, unknown>} */ (
@@ -106,6 +108,7 @@ function readScrapeOptions(message) {
 		preset,
 		formats,
 		skipPromoted: payload.skipPromoted !== false,
+		site: payload.site === "youtube" ? "youtube" : "x",
 	};
 }
 
@@ -153,11 +156,14 @@ async function dumpNetworkLog() {
  * media, attach thread relations, validate, bundle or split videos,
  * download the archive. Never rejects: the popup polls for the result.
  *
- * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean }} options
+ * @param {{ autoScroll: boolean, videoMode: string, preset: string, formats: string[], skipPromoted: boolean, site: string }} options
  * @returns {Promise<import("./messaging.js").Message>}
  */
 async function downloadThread(options) {
 	try {
+		if (options.site === "youtube") {
+			return await downloadVideo();
+		}
 		return await scrapeAndDownload(options);
 	} catch (error) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
@@ -165,6 +171,75 @@ async function downloadThread(options) {
 			detail: withTabHint(error),
 		});
 	}
+}
+
+/**
+ * YouTube path (jalur B): bodies ride from the tab buffer, assembly and
+ * rendering happen here, then the tab zips. No scroll, no media bucket,
+ * no API merge — one parse, one archive. Same never-rejects contract.
+ *
+ * @returns {Promise<import("./messaging.js").Message>}
+ */
+async function downloadVideo() {
+	const reply = await forwardToActiveTab(
+		createMessage(MESSAGE_TYPES.SCRAPE_START, { site: "youtube" }),
+	);
+	if (!isMessage(reply) || reply.type !== MESSAGE_TYPES.SCRAPE_DONE) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "SCRAPE_FAILED",
+		});
+	}
+	const payload = /** @type {Record<string, unknown>} */ (reply.payload);
+	const sourceUrl = typeof payload.sourceUrl === "string" ? payload.sourceUrl : "";
+	const video = assembleVideoPayload(
+		payload.timedBodies,
+		payload.playerBodies,
+		sourceUrl,
+	);
+	if (video.segments.length === 0) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "EMPTY_TRANSCRIPT",
+			detail:
+				"No caption segments captured — play the video with captions for a bit, then try again. Some videos have no captions at all.",
+		});
+	}
+	const files = [
+		{ name: "video.json", text: JSON.stringify(video, null, 2) },
+		{ name: "video.md", text: renderVideoMarkdown(video) },
+	];
+	const zipReply = await forwardToActiveTab(
+		createMessage(MESSAGE_TYPES.BUILD_ZIP, { files }),
+	);
+	if (
+		!isMessage(zipReply) ||
+		zipReply.type !== MESSAGE_TYPES.SCRAPE_DONE ||
+		typeof zipReply.payload.zipBase64 !== "string"
+	) {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "ZIP_FAILED",
+		});
+	}
+	const filename = `${safeVideoId(video.videoId)}.zip`;
+	await chrome.downloads.download({
+		url: `data:application/zip;base64,${zipReply.payload.zipBase64}`,
+		filename,
+		saveAs: false,
+	});
+	return createMessage(MESSAGE_TYPES.SCRAPE_DONE, {
+		kind: "video",
+		filename,
+		count: video.segments.length,
+	});
+}
+
+/**
+ * @param {string} videoId
+ * @returns {string} Filesystem-safe stem, never empty.
+ */
+function safeVideoId(videoId) {
+	const safe = String(videoId ?? "").replace(/[^A-Za-z0-9-_]+/g, "-");
+	return safe === "" ? "video" : safe;
+}
 }
 
 /**

@@ -157,3 +157,71 @@ export function extractVideoMeta(body) {
 		author: typeof details.author === "string" ? details.author : "",
 	};
 }
+
+/**
+ * @typedef {Object} VideoPayload
+ * @property {string} videoId Page URL wins, player body is the fallback.
+ * @property {string} title
+ * @property {string} url Watch URL as opened.
+ * @property {number} durationSeconds
+ * @property {string} lang Manual track language first, else first track, else "".
+ * @property {VideoSegment[]} segments In capture order, never re-sorted.
+ */
+
+/**
+ * Extracts the watch id. Short links (`youtu.be/<id>`) work too;
+ * anything else yields "" and the caller falls back honestly.
+ *
+ * @param {unknown} url
+ * @returns {string}
+ */
+function videoIdFromUrl(url) {
+	const match =
+		typeof url === "string"
+			? url.match(/[?&]v=([A-Za-z0-9_-]{11})|youtu\.be\/([A-Za-z0-9_-]{11})/)
+			: null;
+	return match?.[1] ?? match?.[2] ?? "";
+}
+
+/**
+ * Assembles one payload from captured buffers. First timed body with real
+ * segments wins (newest capture first — mirrors timelineApiBodies order);
+ * meta and tracks come from the first player body with an identity.
+ * Missing pieces stay empty, never guessed.
+ *
+ * @param {unknown} timedBodies Newest-first /api/timedtext bodies.
+ * @param {unknown} playerBodies Newest-first /youtubei/v1/player bodies.
+ * @param {unknown} url Watch URL as opened.
+ * @returns {VideoPayload}
+ */
+export function assembleVideoPayload(timedBodies, playerBodies, url) {
+	const timed = Array.isArray(timedBodies) ? timedBodies : [];
+	const players = Array.isArray(playerBodies) ? playerBodies : [];
+	let segments = /** @type {VideoSegment[]} */ ([]);
+	for (const body of timed) {
+		const parsed = extractSegments(body);
+		if (parsed.length > 0) {
+			segments = parsed;
+			break;
+		}
+	}
+	let meta = extractVideoMeta("");
+	let tracks = /** @type {VideoTrack[]} */ ([]);
+	for (const body of players) {
+		const candidate = extractVideoMeta(body);
+		if (candidate.videoId !== "") {
+			meta = candidate;
+			tracks = extractTracks(body);
+			break;
+		}
+	}
+	const manual = tracks.find((track) => track.kind !== "asr");
+	return {
+		videoId: videoIdFromUrl(url) || meta.videoId,
+		title: meta.title,
+		url: typeof url === "string" ? url : "",
+		durationSeconds: meta.durationSeconds,
+		lang: manual?.languageCode ?? tracks[0]?.languageCode ?? "",
+		segments,
+	};
+}

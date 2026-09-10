@@ -42,7 +42,7 @@ export const SITE_ADAPTERS = [
 	{
 		id: "youtube",
 		hosts: ["youtube.com"],
-		scripts: ["src/hook-main.js", "src/content.js"],
+		scripts: ["src/hook-main.js", "vendor/jszip.min.js", "src/content.js"],
 		global: "XYoutube",
 	},
 ];

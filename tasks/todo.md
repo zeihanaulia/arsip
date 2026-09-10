@@ -73,7 +73,7 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [x] Task 13c: Sampel timedtext + shape notes (bahan latih parser)
 - [x] Task 14: Parser YouTube (youtube-graphql.js) — timedtext jadi VideoPayload
 - [x] Task 15: Exporter video.md + video.json (LLM-ready)
-- [ ] Task 16: Wiring tab — registry + manifest + content route + background path
+- [x] Task 16: Wiring tab — registry + manifest + content route + background path
 - [ ] Task 17: Popup + tests + uji manual video asli
 
 ## Checkpoint: Complete (Phase 6)
