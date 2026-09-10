@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { detectAdapter, SITE_ADAPTERS } from "../src/sites/registry.js";
+
+describe("detectAdapter", () => {
+	it("routes X hosts to the x adapter", () => {
+		assert.equal(detectAdapter("https://x.com/a/status/1"), "x");
+		assert.equal(detectAdapter("https://twitter.com/a/status/1"), "x");
+	});
+
+	it("routes OReilly chapters to the oreilly adapter", () => {
+		assert.equal(
+			detectAdapter(
+				"https://learning.oreilly.com/library/view/book/9781098140632/ch02.html",
+			),
+			"oreilly",
+		);
+	});
+
+	it("returns null for unregistered sites", () => {
+		assert.equal(detectAdapter("https://example.com/page"), null);
+		assert.equal(detectAdapter("not a url"), null);
+	});
+
+	it("registers every adapter with its classic scripts", () => {
+		for (const adapter of SITE_ADAPTERS) {
+			assert.ok(adapter.id.length > 0);
+			assert.ok(adapter.scripts.length > 0);
+			assert.ok(adapter.scripts.every((file) => file.endsWith(".js")));
+		}
+	});
+});
