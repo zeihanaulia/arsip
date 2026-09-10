@@ -4,6 +4,7 @@ import {
 	renderMediaList,
 	renderThreadHtml,
 	renderThreadMarkdown,
+	renderVideoMarkdown,
 } from "../src/export-html.js";
 import { createThreadSnapshot, createTweet } from "../src/model.js";
 
@@ -118,5 +119,47 @@ describe("renderThreadMarkdown", () => {
 		assert.ok(md.includes("Realistically speaking"));
 		assert.ok(md.includes("26 likes"));
 		assert.ok(md.includes("2026-09-05"));
+	});
+});
+
+describe("renderVideoMarkdown", () => {
+	const video = {
+		videoId: "w9FGJ4x_VI0",
+		title: "Talenta Indonesia Jadi Lead Architect di NVIDIA",
+		url: "https://www.youtube.com/watch?v=w9FGJ4x_VI0",
+		durationSeconds: 7543,
+		lang: "id",
+		segments: [
+			{ t: "00:00", seconds: 0, text: "Ketika saya ke Austin" },
+			{ t: "00:05", seconds: 5, text: "Secara filosofis <b>ya</b> & gitu" },
+			{ t: "00:10", seconds: 10, text: "  " },
+		],
+	};
+
+	it("renders title, link, duration, and ordered timestamped segments", () => {
+		const md = renderVideoMarkdown(video);
+
+		assert.ok(md.includes("# Talenta Indonesia Jadi Lead Architect di NVIDIA"));
+		assert.ok(md.includes("https://www.youtube.com/watch?v=w9FGJ4x_VI0"));
+		assert.ok(md.includes("2:05:43"));
+		assert.ok(md.includes("[00:00] Ketika saya ke Austin"));
+		const head1 = md.indexOf("[00:00]");
+		const head2 = md.indexOf("[00:05]");
+		assert.ok(head1 >= 0 && head1 < head2);
+	});
+
+	it("keeps markdown usable with escaped text and skips empty segments", () => {
+		const md = renderVideoMarkdown(video);
+
+		assert.ok(!md.includes("<b>ya</b>"), "raw HTML must not leak into MD");
+		assert.ok(md.includes("ya"));
+		assert.ok(!md.includes("[00:10]"), "whitespace-only segments are skipped");
+	});
+
+	it("stays honest for videos without segments", () => {
+		const md = renderVideoMarkdown({ ...video, segments: [], title: "" });
+
+		assert.ok(md.includes("w9FGJ4x_VI0"));
+		assert.ok(md.includes("no transcript segments captured"));
 	});
 });

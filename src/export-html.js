@@ -288,3 +288,62 @@ Scraped: ${snapshot?.scrapedAt ?? ""}
 ${sections.join("\n\n---\n\n")}
 `;
 }
+
+/**
+ * Renders a video transcript as LLM-ready Markdown: title, link, duration,
+ * then one `[mm:ss] text` line per segment in capture order. Segment text is
+ * transcript verbatim except HTML-tag stripping (auto captions sometimes carry
+ * markup) and whitespace trim; empty segments are skipped, never rendered blank.
+ *
+ * @param {{ videoId?: string, title?: string, url?: string, durationSeconds?: number, lang?: string, segments?: { t?: string, text?: string }[] }} video
+ * @returns {string}
+ */
+export function renderVideoMarkdown(video) {
+	const title = video?.title || video?.videoId || "Untitled video";
+	const lines = (video?.segments ?? [])
+		.map((segment) => videoSegmentLine(segment))
+		.filter((line) => line !== "");
+	const body =
+		lines.length > 0 ? lines.join("\n") : "_no transcript segments captured_";
+	const langLine = video?.lang ? `\nLanguage: ${video.lang}` : "";
+	return `# ${title}
+
+${video?.url ?? ""}${langLine}
+Duration: ${formatDuration(video?.durationSeconds)}
+
+${body}
+`;
+}
+
+/**
+ * @param {{ t?: string, text?: string }} segment
+ * @returns {string} "" when the segment carries no readable text.
+ */
+function videoSegmentLine(segment) {
+	const text = (segment?.text ?? "")
+		.replace(/<[^>]*>/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (text === "") {
+		return "";
+	}
+	return `[${segment?.t ?? "??:??"}] ${text}`;
+}
+
+/**
+ * @param {unknown} value Seconds, possibly stringy or missing.
+ * @returns {string} "m:ss" or "h:mm:ss", "unknown" when unparseable.
+ */
+function formatDuration(value) {
+	const total = typeof value === "number" ? Math.floor(value) : NaN;
+	if (!Number.isFinite(total) || total < 0) {
+		return "unknown";
+	}
+	const hours = Math.floor(total / 3600);
+	const minutes = String(Math.floor((total % 3600) / 60)).padStart(
+		hours > 0 ? 2 : 1,
+		"0",
+	);
+	const seconds = String(total % 60).padStart(2, "0");
+	return hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
+}
