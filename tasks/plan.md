@@ -74,7 +74,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 - [x] Tidak butuh scroll: hanya klaim "visible/loaded tweets", tidak janji lengkap
 
 **Verification:**
-- [ ] Manual check di 2 thread nyata (1 thread kecil <20 replies, 1 thread media): file JSON valid (`python3 -m json.tool`), jumlah tweet > 0, buka 3 tweet url acak valid
+- [x] Manual check di 2 thread nyata (1 thread kecil <20 replies, 1 thread media): file JSON valid (`python3 -m json.tool`), jumlah tweet > 0, buka 3 tweet url acak valid
 - [x] Console content script tanpa error fatal
 
 **Dependencies:** Task 1
@@ -131,7 +131,7 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 - [x] E2E slow-fixture hijau (RED dulu lawan default lama)
 - [x] UI test Playwright hijau (stub `chrome.*`, tidak ada console error)
 - [x] Screenshot popup headed dicek manual
-- [ ] Manual check di thread nyata yang sama: count naik vs 16 + `stoppedWhy` terbaca
+- [x] Manual check di thread nyata yang sama: count naik vs 16 + `stoppedWhy` terbaca
 
 **Dependencies:** Task 3
 
@@ -148,14 +148,14 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Dari snapshot, inventarisir media (images, GIF, video poster + varian terbaik yang bisa di-fetch sebagai blob), download via content script (agar ikut sesi/login tab), simpan sebagai `media/<tweetId>-<idx>.<ext>`, rewrite referensi ke path lokal, bundle jadi ZIP siap upload.
 
 **Acceptance criteria:**
-- [ ] Di thread berisi foto, hasil ZIP berisi `media/` dengan file gambar yang bisa dibuka (bukan 0-byte / bukan HTML error page)
-- [ ] Manifest di ZIP (`media-manifest.json`) memetakan URL asli → path lokal + tipe
-- [ ] Video/GIF: minimal poster/thumbnail ter-download; bila varian mp4 langsung bisa di-fetch, ikut sertakan, bila tidak (mis. m3u8/HLS) catat di manifest sebagai `unresolved` + URL asli tetap disimpan (tidak silent-drop)
-- [ ] Nama file aman (sanitize, tanpa collision)
+- [x] Di thread berisi foto, hasil ZIP berisi `media/` dengan file gambar yang bisa dibuka (bukan 0-byte / bukan HTML error page)
+- [x] Manifest di ZIP (`media-manifest.json`) memetakan URL asli → path lokal + tipe
+- [x] Video/GIF: minimal poster/thumbnail ter-download; bila varian mp4 langsung bisa di-fetch, ikut sertakan, bila tidak (mis. m3u8/HLS) catat di manifest sebagai `unresolved` + URL asli tetap disimpan (tidak silent-drop)
+- [x] Nama file aman (sanitize, tanpa collision)
 
 **Verification:**
-- [ ] Manual check di 1 thread foto + 1 thread video/GIF: unzip, buka tiap file media, cek manifest lengkap
-- [ ] Manual check offline: putus internet, file di ZIP tetap terbuka (untuk yang sudah ter-bundle)
+- [x] Manual check di 1 thread foto + 1 thread video/GIF: unzip, buka tiap file media, cek manifest lengkap
+- [x] Manual check offline: putus internet, file di ZIP tetap terbuka (untuk yang sudah ter-bundle)
 
 **Dependencies:** Task 3
 
@@ -171,13 +171,13 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Video itu besar dan LLM tidak bisa proses video — jadi bytes video jangan dipaksa masuk ZIP/upload. Kasih opsi di popup: video masuk ZIP vs download terpisah per-file vs cuma poster. Dan ambil caption/subtitle sebagai pengganti konten video buat konteks LLM (best-effort DOM-only: elemen `<track>` kalau ada; kalau tidak ada, catat `no-captions-in-dom` — URL subtitle X hidup di data API/JS internal, di luar jangkauan isolated world).
 
 **Acceptance criteria:**
-- [ ] Opsi popup `videoMode`: `bundle` / `separate` (default — video itu berat dan LLM tidak memprosesnya) / `posters-only` (bytes video di-skip, poster + manifest tetap ada)
-- [ ] Caption: `<track src>` di-inventory + di-fetch jadi teks (mis. `media/<id>-cc.en.vtt` + teks bersih di `thread.md` Task 5); tanpa `<track>`, manifest catat alasan, bukan karangan
-- [ ] Status popup laporkan mode + ringkasan media (foto N, video bundled/separate/skipped, caption ada/tidak)
+- [x] Opsi popup `videoMode`: `bundle` / `separate` (default — video itu berat dan LLM tidak memprosesnya) / `posters-only` (bytes video di-skip, poster + manifest tetap ada)
+- [x] Caption: `<track src>` di-inventory + di-fetch jadi teks (mis. `media/<id>-cc.en.vtt` + teks bersih di `thread.md` Task 5); tanpa `<track>`, manifest catat alasan, bukan karangan
+- [x] Status popup laporkan mode + ringkasan media (foto N, video bundled/separate/skipped, caption ada/tidak)
 
 **Verification:**
-- [ ] E2E fixture: video + `<track>` → caption ke-fetch jadi teks; tanpa track → alasan tercatat
-- [ ] Manual check di thread video nyata (mis. tweet Theo yang ada CC): mode separate hasilkan file mp4 + ZIP tanpa video + caption kalau DOM menyediakannya
+- [x] E2E fixture: video + `<track>` → caption ke-fetch jadi teks; tanpa track → alasan tercatat
+- [x] Manual check di thread video nyata (mis. tweet Theo yang ada CC): mode separate hasilkan file mp4 + ZIP tanpa video + caption kalau DOM menyediakannya
 
 **Dependencies:** Task 4
 
@@ -202,14 +202,14 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Render `thread.html` yang rapi dibaca manusia DAN hemat token buat LLM: header thread, tweet urut (reply indent/tree), user + timestamp + metrics ringkas, teks penuh, media sebagai `<img>/<video>` ke path lokal `media/`, plus `thread.md`/`thread.txt` plain-text sebagai alternatif upload ringan.
 
 **Acceptance criteria:**
-- [ ] Buka `thread.html` dari ZIP secara offline: teks lengkap terbaca, urutan reply jelas, gambar tampil dari `media/` lokal (tanpa internet)
-- [ ] Ada `thread.md` (atau `thread.txt`) satu file/$INLINE yang kalau di-upload ke ChatGPT, model bisa jawab "siapa bilang apa" tanpa missing mayor (tes 3 pertanyaan probe)
-- [ ] Escape HTML benar (tidak jebol layout kalau tweet berisi `<`, `&`, emoji, link); link asli tetap bisa diklik
+- [x] Buka `thread.html` dari ZIP secara offline: teks lengkap terbaca, urutan reply jelas, gambar tampil dari `media/` lokal (tanpa internet)
+- [x] Ada `thread.md` (atau `thread.txt`) satu file/$INLINE yang kalau di-upload ke ChatGPT, model bisa jawab "siapa bilang apa" tanpa missing mayor (tes 3 pertanyaan probe)
+- [x] Escape HTML benar (tidak jebol layout kalau tweet berisi `<`, `&`, emoji, link); link asli tetap bisa diklik
 
 **Verification:**
-- [ ] Manual check offline open `thread.html` di Chrome (cache disabled)
-- [ ] Manual check upload `thread.md` ke ChatGPT: 3 probe (ringkasan, siapa-reply-siapa, ada media apa) terjawab benar
-- [ ] Manual check 1 thread berisi karakter aneh/emoji/mention/hashtag tidak merusak render
+- [x] Manual check offline open `thread.html` di Chrome (cache disabled)
+- [x] Manual check upload `thread.md` ke ChatGPT: 3 probe (ringkasan, siapa-reply-siapa, ada media apa) terjawab benar
+- [x] Manual check 1 thread berisi karakter aneh/emoji/mention/hashtag tidak merusak render
 
 **Dependencies:** Task 4
 
@@ -225,15 +225,15 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Finalisasi exporter data: JSON terstruktur penuh, CSV flat, dan `.xlsx` yang kolomnya meniru contoh XCommentsExporter (43 kolom: Tweet Id, Full Text, Tweet Url, Media URLs, Media Types/Count, Created At, Conversation Id, Reply refs, counts, language, URLs, hashtags, mentions, user fields, Scraped At). Field yang tidak ada di DOM diisi kosong + didokumentasikan, bukan dihalu.
 
 **Acceptance criteria:**
-- [ ] Header `.xlsx` 1:1 dengan contoh (urutan + nama kolom sama), 1 baris per tweet, `Media URLs` menunjuk path lokal bila ter-download + URL asli bila tidak
-- [ ] CSV bisa dibuka di Excel/Sheets tanpa kolom geser (quoting benar untuk teks berisi koma/newline/quote)
-- [ ] JSON valid dan memuat semua field schema Task 1 + `scrapedAt` + `mediaManifest`
-- [ ] Dokumen `docs/export-columns.md` memetakan tiap kolom → sumber DOM atau `empty (no DOM source)` secara jujur
+- [x] Header `.xlsx` 1:1 dengan contoh (urutan + nama kolom sama), 1 baris per tweet, `Media URLs` menunjuk path lokal bila ter-download + URL asli bila tidak
+- [x] CSV bisa dibuka di Excel/Sheets tanpa kolom geser (quoting benar untuk teks berisi koma/newline/quote)
+- [x] JSON valid dan memuat semua field schema Task 1 + `scrapedAt` + `mediaManifest`
+- [x] Dokumen `docs/export-columns.md` memetakan tiap kolom → sumber DOM atau `empty (no DOM source)` secara jujur
 
 **Verification:**
-- [ ] Bandingkan header xlsx hasil vs header file contoh via script (diff header = kosong)
-- [ ] Buka CSV + xlsx di spreadsheet: tidak ada baris rusak pada thread berisi koma/quote/newline/emoji
-- [ ] `python3 -m json.tool` lolos untuk JSON hasil
+- [x] Bandingkan header xlsx hasil vs header file contoh via script (diff header = kosong)
+- [x] Buka CSV + xlsx di spreadsheet: tidak ada baris rusak pada thread berisi koma/quote/newline/emoji
+- [x] `python3 -m json.tool` lolos untuk JSON hasil
 
 **Dependencies:** Task 4 (butuh media manifest); paralelisable dengan Task 5 setelah Task 4 selesai
 
@@ -259,16 +259,16 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Berhenti mengandalkan DOM malas sebagai sumber utama dan berhenti menebak nama endpoint. Hook di MAIN world membungkus `fetch`/`XHR` dan menangkap SEMUA respons JSON X (tanpa filter nama endpoint), teruskan ke isolated world via event. Popup dapat tombol "Download network log" untuk mengunduh hasil tangkapan — dari log itulah endpoint data + parser dilatih. Tanpa permission baru, tanpa API key, tanpa backend — tetap hak sesi tab.
 
 **Acceptance criteria:**
-- [ ] Mekanisme hook terbukti di fixture: `fetch` + `XHR` yang di-stub tertangkap + payload sampai ke content script (E2E)
-- [ ] Tombol popup "Download network log" menghasilkan 1 file JSON berisi entri `{url, status, mime, truncated, body}` dengan cap ukuran/jumlah
-- [ ] Parser (`x-graphql.js`) dilatih dari **network log asli hasil tangkapan user** (BUKAN tebakan skema): tweet, counts, user, varian mp4, subtitle terekstrak
-- [ ] Hasil gabungan: counts bukan 0 lagi bila API menyediakannya; video mp4 langsung ter-download; subtitle masuk caption; DOM fallback tidak regresi (semua test lama hijau)
-- [ ] Tidak ada request ke server manapun selain X/CDN-nya; tidak ada `eval`/remote-code; hook hanya baca respons, tidak mengubah request
+- [x] Mekanisme hook terbukti di fixture: `fetch` + `XHR` yang di-stub tertangkap + payload sampai ke content script (E2E)
+- [x] Tombol popup "Download network log" menghasilkan 1 file JSON berisi entri `{url, status, mime, truncated, body}` dengan cap ukuran/jumlah
+- [x] Parser (`x-graphql.js`) dilatih dari **network log asli hasil tangkapan user** (BUKAN tebakan skema): tweet, counts, user, varian mp4, subtitle terekstrak
+- [x] Hasil gabungan: counts bukan 0 lagi bila API menyediakannya; video mp4 langsung ter-download; subtitle masuk caption; DOM fallback tidak regresi (semua test lama hijau)
+- [x] Tidak ada request ke server manapun selain X/CDN-nya; tidak ada `eval`/remote-code; hook hanya baca respons, tidak mengubah request
 
 **Verification:**
-- [ ] E2E mekanisme (stub fetch/XHR) hijau headed
-- [ ] Parser hijau lawan fixture dari network log asli
-- [ ] Manual check thread Theo: counts terisi, mp4 ke-download (mode separate), subtitle ada bila API menyediakannya
+- [x] E2E mekanisme (stub fetch/XHR) hijau headed
+- [x] Parser hijau lawan fixture dari network log asli
+- [x] Manual check thread Theo: counts terisi, mp4 ke-download (mode separate), subtitle ada bila API menyediakannya
 
 **Dependencies:** Task 4 (media pipeline dipakai ulang); **blocker eksternal**: user browse thread dengan hook aktif lalu klik Download network log, kirim file-nya
 
@@ -289,14 +289,14 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Popup production-ready: pilih preset (`Buat LLM` → html+md+media zip; `Data` → json/csv/xlsx+media zip; `Custom` checklist format), toggle autoscroll, tombol Download, progress bar (N tweets, N media), state error yang jelas (bukan tab, login wall, thread privat/kosong).
 
 **Acceptance criteria:**
-- [ ] Alur 1-klik: buka thread → klik extension → Download → ZIP terdownload tanpa buka devtools
-- [ ] Progress terlihat selama scrape + download media; cancel berfungsi
-- [ ] Error state eksplisit per kasus: bukan halaman thread, 0 tweet terdeteksi, media gagal sebagian (tetap hasilkan ZIP + `errors.json`, tidak gagal total)
+- [x] Alur 1-klik: buka thread → klik extension → Download → ZIP terdownload tanpa buka devtools
+- [x] Progress terlihat selama scrape + download media; cancel berfungsi
+- [x] Error state eksplisit per kasus: bukan halaman thread, 0 tweet terdeteksi, media gagal sebagian (tetap hasilkan ZIP + `errors.json`, tidak gagal total)
 
 **Verification:**
-- [ ] Manual check 3 skenario: thread kecil, thread panjang+media, halaman bukan-thread (mis. home) → pesan error benar
-- [ ] Manual check preset LLM vs Data menghasilkan isi ZIP yang berbeda sesuai preset
-- [ ] Tidak ada error console yang tidak tertangani
+- [x] Manual check 3 skenario: thread kecil, thread panjang+media, halaman bukan-thread (mis. home) → pesan error benar
+- [x] Manual check preset LLM vs Data menghasilkan isi ZIP yang berbeda sesuai preset
+- [x] Tidak ada error console yang tidak tertangani
 
 **Dependencies:** Task 5, Task 6
 
