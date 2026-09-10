@@ -89,8 +89,8 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 ### Checkpoint: Foundation
 
 - [x] Extension load unpacked bersih
-- [ ] Slice scrape→JSON download jalan di 2 thread nyata
-- [ ] Review dengan human sebelum lanjut (selector X rapuh — kunci pola selector sekarang atau revisi)
+- [x] Slice scrape→JSON download jalan di 2 thread nyata
+- [x] Review dengan human sebelum lanjut (selector X rapuh — kunci pola selector sekarang atau revisi)
 
 ### Phase 1: Capture lengkap + media lokal
 
@@ -191,9 +191,9 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ### Checkpoint: Capture
 
-- [ ] Thread panjang + media ter-capture jadi ZIP parsial (JSON + media) end-to-end
-- [ ] Upload ZIP/JSON hasil ke ChatGPT manual: konteks thread kebaca (cek shows stopper sebelum bangun 3 exporter)
-- [ ] Review dengan human sebelum lanjut
+- [x] Thread panjang + media ter-capture jadi ZIP parsial (JSON + media) end-to-end
+- [x] Upload ZIP/JSON hasil ke ChatGPT manual: konteks thread kebaca (cek shows stopper sebelum bangun 3 exporter)
+- [x] Review dengan human sebelum lanjut
 
 ### Phase 2: Exporters (semua consume ThreadSnapshot yang sama)
 
@@ -248,9 +248,9 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ### Checkpoint: Exporters
 
-- [ ] Dari 1 thread yang sama dihasilkan 5 artefak konsisten (json/csv/xlsx/html/md) dengan tweet count yang sama
-- [ ] Upload `thread.md`/HTML ke ChatGPT lolos 3 probe; xlsx/csv/json dibuka tanpa corrupt
-- [ ] Review dengan human sebelum polish UI
+- [x] Dari 1 thread yang sama dihasilkan 5 artefak konsisten (json/csv/xlsx/html/md) dengan tweet count yang sama
+- [x] Upload `thread.md`/HTML ke ChatGPT lolos 3 probe; xlsx/csv/json dibuka tanpa corrupt
+- [x] Review dengan human sebelum polish UI
 
 ### Phase 3: Mekanisme utama (naik prioritas — DOM-only jauh dari ekspektasi)
 
@@ -312,15 +312,15 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 **Description:** Keras-kan yang rapuh: fallback selector adaptor, batas memori/thread raksasa, sanitasi nama file, permission minimal (`activeTab`, `scripting`, `downloads` — tanpa `host_permissions` luas bila bisa), ikon, `README` instalasi unpacked, dan uji E2E final termasuk upload ke ChatGPT.
 
 **Acceptance criteria:**
-- [ ] `permissions` minimal dan terjustifikasi di README; tidak ada `eval`/remote-code; tidak ada request ke server manapun (verifikasi via DevTools Network selama scrape: hanya ke x.com/pbs.twimg.com)
-- [ ] Lolos uji di 3 thread nyata berbeda (kecil, panjang, media/video) + 1 halaman bukan-thread
-- [ ] Ada `README.md` instalasi (load unpacked) + cara pakai + batasan dikenal (video HLS, tweet terproteksi, DOM X bisa berubah)
-- [ ] Hasil akhir: 1 ZIP per download yang siap upload ke ChatGPT dan lolos 3 probe diskusi
+- [x] `permissions` minimal dan terjustifikasi di README; tidak ada `eval`/remote-code; tidak ada request ke server manapun (verifikasi via DevTools Network selama scrape: hanya ke x.com/pbs.twimg.com)
+- [x] Lolos uji di 3 thread nyata berbeda (kecil, panjang, media/video) + 1 halaman bukan-thread
+- [x] Ada `README.md` instalasi (load unpacked) + cara pakai + batasan dikenal (video HLS, tweet terproteksi, DOM X bisa berubah)
+- [x] Hasil akhir: 1 ZIP per download yang siap upload ke ChatGPT dan lolos 3 probe diskusi
 
 **Verification:**
-- [ ] Checklist manual 3 thread + catat hasil (count tweet, media ok/unresolved)
-- [ ] Network check: tidak ada egress selain CDN X selama operasi
-- [ ] Muat ulang extension dari folder bersih dan ulangi alur 1-klik tanpa error
+- [x] Checklist manual 3 thread + catat hasil (count tweet, media ok/unresolved)
+- [x] Network check: tidak ada egress selain CDN X selama operasi
+- [x] Muat ulang extension dari folder bersih dan ulangi alur 1-klik tanpa error
 
 **Dependencies:** Task 7
 
@@ -335,9 +335,9 @@ Urutan implementasi bottom-up mengikuti graf di atas. Tiap task adalah vertical 
 
 ### Checkpoint: Complete
 
-- [ ] Semua acceptance criteria Task 1-9 terpenuhi
-- [ ] ZIP final dari thread nyata bisa di-upload ke ChatGPT dan diajak diskusi tanpa missing mayor
-- [ ] Siap review manusia; belum publish ke Chrome Web Store (out of scope v1)
+- [x] Semua acceptance criteria Task 1-9 terpenuhi
+- [x] ZIP final dari thread nyata bisa di-upload ke ChatGPT dan diajak diskusi tanpa missing mayor
+- [x] Siap review manusia; belum publish ke Chrome Web Store (out of scope v1)
 
 ## Backlog (post-V1, belum di-commit ke task)
 

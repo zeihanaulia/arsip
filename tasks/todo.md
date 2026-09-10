@@ -9,9 +9,9 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Checkpoint: Foundation
 
-- [ ] Extension load unpacked bersih
-- [ ] Slice scrape→JSON jalan di 2 thread nyata
-- [ ] Review human sebelum lanjut
+- [x] Extension load unpacked bersih
+- [x] Slice scrape→JSON jalan di 2 thread nyata
+- [x] Review human sebelum lanjut
 
 ## Phase 1: Capture lengkap + media lokal
 
@@ -22,9 +22,9 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Checkpoint: Capture
 
-- [ ] ZIP parsial (JSON + media) end-to-end jalan
-- [ ] Upload hasil ke ChatGPT kebaca (cek stopper)
-- [ ] Review human sebelum lanjut
+- [x] ZIP parsial (JSON + media) end-to-end jalan
+- [x] Upload hasil ke ChatGPT kebaca (cek stopper)
+- [x] Review human sebelum lanjut
 
 ## Phase 2: Exporters
 
@@ -33,9 +33,9 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Checkpoint: Exporters
 
-- [ ] 5 artefak konsisten (json/csv/xlsx/html/md), count sama
-- [ ] ChatGPT lolos 3 probe; spreadsheet tidak corrupt
-- [ ] Review human sebelum polish UI
+- [x] 5 artefak konsisten (json/csv/xlsx/html/md), count sama
+- [x] ChatGPT lolos 3 probe; spreadsheet tidak corrupt
+- [x] Review human sebelum polish UI
 
 ## Phase 3: Mekanisme utama
 
@@ -45,13 +45,13 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 ## Phase 4: UX + QA packaging
 
 - [x] Task 8: Popup UI final (preset + opsi + progress + error)
-- [ ] Task 9: Hardening + packaging + uji ChatGPT E2E
+- [x] Task 9: Hardening + packaging + uji ChatGPT E2E
 
 ## Checkpoint: Complete
 
-- [ ] Semua acceptance Task 1-9 terpenuhi
-- [ ] ZIP final siap upload ke ChatGPT tanpa missing mayor
-- [ ] Siap review; belum publish ke Web Store (out of scope v1)
+- [x] Semua acceptance Task 1-9 terpenuhi
+- [x] ZIP final siap upload ke ChatGPT tanpa missing mayor
+- [x] Siap review; belum publish ke Web Store (out of scope v1)
 
 ## Backlog (post-V1)
 
