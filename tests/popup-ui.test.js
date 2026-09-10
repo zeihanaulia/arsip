@@ -241,9 +241,7 @@ describe("popup UI (stubbed chrome APIs)", () => {
 			Object.assign(globalThis, {
 				chrome: {
 					tabs: {
-						query: async () => [
-							{ id: 9, url: "https://learning.oreilly.com/library/view/x" },
-						],
+						query: async () => [{ id: 9, url: "https://example.com/page" }],
 					},
 					runtime: {
 						sendMessage: async () => {

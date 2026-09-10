@@ -21,11 +21,7 @@ describe("detectAdapter", () => {
 
 	it("returns null for unregistered sites", () => {
 		assert.equal(detectAdapter("https://example.com/page"), null);
-		assert.equal(
-			detectAdapter("https://learning.oreilly.com/library/view/x"),
-			null,
-			"oreilly lives on its own branch, not on main",
-		);
+		assert.equal(detectAdapter("https://vimeo.com/12345"), null);
 		assert.equal(detectAdapter("not a url"), null);
 	});
 
