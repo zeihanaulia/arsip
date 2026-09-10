@@ -68,8 +68,8 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Phase 6: V2 adapter ketiga — transcript YouTube (1 video → MD buat LLM)
 
-- [ ] Task 13a: Branch experiment/youtube dari main
-- [ ] Task 13b: Merge experiment/oreilly masuk (mesin multi-site)
+- [x] Task 13a: Branch experiment/youtube dari main
+- [x] Task 13b: Engine multi-site (cherry-pick registry + hook/netlog youtube; routing download nyusul Task 16)
 - [ ] Task 13c: Validasi lapangan DOM panel transcript (go/no-go, blocker: observasi user)
 - [ ] Task 14: Adapter YouTube — parse transcript jadi VideoPayload
 - [ ] Task 15: Exporter video.md + video.json (LLM-ready)
