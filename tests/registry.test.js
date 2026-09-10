@@ -8,15 +8,6 @@ describe("detectAdapter", () => {
 		assert.equal(detectAdapter("https://twitter.com/a/status/1"), "x");
 	});
 
-	it("routes OReilly chapters to the oreilly adapter", () => {
-		assert.equal(
-			detectAdapter(
-				"https://learning.oreilly.com/library/view/book/9781098140632/ch02.html",
-			),
-			"oreilly",
-		);
-	});
-
 	it("routes YouTube watch pages to the youtube adapter", () => {
 		assert.equal(
 			detectAdapter("https://www.youtube.com/watch?v=abc123DEF45"),
@@ -30,6 +21,11 @@ describe("detectAdapter", () => {
 
 	it("returns null for unregistered sites", () => {
 		assert.equal(detectAdapter("https://example.com/page"), null);
+		assert.equal(
+			detectAdapter("https://learning.oreilly.com/library/view/x"),
+			null,
+			"oreilly lives on its own branch, not on main",
+		);
 		assert.equal(detectAdapter("not a url"), null);
 	});
 
