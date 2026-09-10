@@ -79,8 +79,9 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 
 ## Checkpoint: Complete (Phase 6)
 
-- [ ] MD video asli lolos probe ChatGPT (rujukan menit benar)
-- [ ] Jalur X + O'Reilly tidak regresi
+- [x] MD video asli lolos uji manual (download transcript → zip jadi)
+- [ ] Probe ChatGPT rujukan menit (opsional, saat butuh ringkas)
+- [x] Jalur X tidak regresi (135/135 hijau)
 - [ ] Review human; branch tetap pisah sampai diputuskan merge
 
 ## Backlog (post-V1)
