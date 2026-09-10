@@ -411,6 +411,270 @@ pipeline yang sama (tanpa CSV/XLSX/thread-model).
 - [ ] Jalur X tidak regresi
 - [ ] Review human sebelum adapter situs ketiga
 
+## Phase 6: V2 adapter ketiga — transcript YouTube (scope: 1 video → MD buat LLM)
+
+Keputusan terkunci (`docs/ideas/youtube-transcript.md`): arah E + timestamp per segmen
+dipertahankan. Jalur utama A (scrape panel "Show transcript" DOM-only, nol fetch ke API
+YouTube); B (timedtext via player response) cadangan bila A gugur di validasi lapangan.
+Tanpa `media.js`, tanpa scroller, tanpa xlsx — stack content terkurus: adapter + jszip +
+content. Tanpa backend (batasan keras tetap berlaku).
+
+Keputusan branching (diputus human 2026-09-11): kerja di branch baru dari `main`
+(contoh: `experiment/youtube`), BUKAN dari `experiment/oreilly`. Konsekuensi: mesin
+multi-site (registry, routing `site:`, caps per-site — hasil Task 10-12 yang hidup di
+`experiment/oreilly`) harus dibawa masuk dulu via merge sebelum Task adapter. `main`
+tetap steril X-only; `experiment/oreilly` tetap pisah; penggabungan final diputus belakangan.
+
+## Dependency Graph (Phase 6)
+
+```
+Branch experiment/youtube dari main (Task 13a)
+    │
+    ├── Merge experiment/oreilly masuk (Task 13b: registry + routing + exporter chapter)
+    │       │   Konflik = STOP, lapor human (main dan oreilly tidak boleh divergen diam-diam)
+    │       │
+    │       └── Suite penuh hijau di branch gabungan (syarat keluar Task 13b)
+    │
+    └── Validasi DOM panel transcript (Task 13c, blocker eksternal user, paralelisable dgn 13b)
+            │
+            ├── youtube-adapter.js: parse fixture → VideoPayload (Task 14)
+            │       │
+            │       └── exporter video.md + video.json (Task 15, paralelisable dgn Task 14
+            │               │   setelah kontrak VideoPayload dikunci di Task 14)
+            │               │
+            │               └── wiring: registry + manifest + content route (Task 16)
+            │                       │
+            │                       └── background path + popup + tests + manual (Task 17)
+            │
+            └── Fallback plan B (timedtext) hanya bila Task 13c gugur — STOP dan review human dulu
+```
+
+Urutan bottom-up mengikuti graf. Tiap task vertical slice; sistem tetap working setiap selesai.
+
+## Task 13a: Branch experiment/youtube dari main
+
+**Description:** Titik mulai bersih sesuai putusan human: branch baru dari ujung `main`
+(X-only stabil), bukan dari `experiment/oreilly`. Tanpa perubahan kode — cuma penanda mulai.
+
+**Acceptance criteria:**
+- [ ] Branch `experiment/youtube` ada, parent = ujung `main`, working tree bersih
+- [ ] `tasks/todo.md` Phase 6 ada di branch ini
+
+**Verification:**
+- [ ] `git log --oneline -1` parent sama dengan ujung `main`; `git status` bersih
+
+**Dependencies:** None
+
+**Files likely touched:** (none — penanda branch)
+
+**Estimated scope:** XS
+
+## Task 13b: Merge experiment/oreilly masuk (bawa mesin multi-site)
+
+**Description:** `git merge experiment/oreilly` ke branch YouTube: mengambil registry,
+routing `site:` content/background/popup, caps per-site, dan exporter chapter — tanpa
+membangun ulang plumbing Task 10-12. Adapter O'Reilly ikut kebawa (tidak dipakai buat
+YouTube, tapi juga tidak diganggu). Bila konflik: STOP, tunjukkan diff ke human, jangan
+resolve ngarang.
+
+**Acceptance criteria:**
+- [ ] Merge selesai tanpa konflik tak-terresolve; histori `experiment/oreilly` utuh
+- [ ] `src/sites/registry.js` + routing `site:` + exporter chapter ada di branch
+- [ ] Suite penuh hijau (`npm run verify`) — X dan O'Reilly tidak regresi oleh merge
+
+**Verification:**
+- [ ] `npm run verify` hijau di branch gabungan
+- [ ] `git log --graph --oneline` menunjukkan merge commit eksplisit
+
+**Dependencies:** Task 13a
+
+**Files likely touched:** (hasil merge — registry, content, background, popup, manifest, exporter)
+
+**Estimated scope:** Small (1 merge commit + verifikasi)
+
+## Kontrak VideoPayload (dikunci di Task 14, dikonsumsi Task 15-17)
+
+```js
+{ videoId, title, url, duration, segments: [{ t: "12:34", seconds: 754, text }], lang }
+```
+
+- `t`: timestamp verbatim dari panel (rujukan menit buat prompt ChatGPT).
+- Field yang tidak ada di DOM diisi kosong + jujur — dilarang mengarang (aturan warisan Phase 5).
+- Selector DOM YouTube HANYA di `src/youtube-adapter.js` (aturan AGENTS.md diperluas).
+
+## Task 13c: Validasi lapangan DOM panel transcript (go / no-go)
+
+**Description:** Sebelum satu baris kode produksi: user buka 2-3 video (satu yang ada caption manual,
+satu auto-generated, satu tanpa caption), buka panel "Show transcript" manual, simpan HTML
+halaman + catat struktur DOM segmen (tag, class selector timestamp/teks, tombol pembuka panel,
+sinyal DOM saat video tidak punya caption). Output = fixture + catatan, bukan kode.
+
+**Acceptance criteria:**
+- [ ] Ada `tests/fixtures/transcript-synth-*.html` (atau HTML asli tersimpan) yang memuat
+  struktur segmen transcript asli
+- [ ] Ada catatan (`docs/notes/youtube-transcript-dom.md`): selector timestamp, selector teks,
+  cara membuka panel programmatic, sinyal DOM video-tanpa-caption
+- [ ] Keputusan eksplisit: jalur A lanjut ATAU gugur ke plan B (timedtext)
+
+**Verification:**
+- [ ] Manual check: selector catatan dicoba di DevTools 2 video berbeda, segmen kebaca
+- [ ] Bila jalur A gugur: STOP, review human, plan direvisi sebelum Task 14
+
+**Dependencies:** None (blocker eksternal: user sediakan observasi + file HTML;
+paralelisable dengan Task 13b — keduanya prasyarat Task 14)
+
+**Files likely touched:**
+- `tests/fixtures/transcript-*.html` (baru)
+- `docs/notes/youtube-transcript-dom.md` (baru)
+
+**Estimated scope:** Small (2 files, mostly field work)
+
+## Task 14: Adapter YouTube — parse transcript jadi VideoPayload
+
+**Description:** `src/youtube-adapter.js` (classic script, expose `XYoutube`): `parseTranscript(html, baseUrl)`
+→ `VideoPayload` (videoId dari URL, judul, durasi, segmen timestamp+teks berurutan, bahasa apa adanya).
+Fallback multi-selector ala `x-adapter.js`. TDD lawan fixture Task 13: RED dulu, GREEN sesudahnya.
+
+**Acceptance criteria:**
+- [ ] E2E (real Chromium, headed bila diminta): judul + N segmen berurutan + timestamp verbatim
+  ter-parse dari fixture; video-tanpa-caption → payload kosong jujur (bukan error, bukan karangan)
+- [ ] Tidak ada selector X/O'Reilly yang bocor ke adapter ini (dan sebaliknya)
+- [ ] `npm run verify` hijau (biome + tsc + suite lama tanpa regresi)
+
+**Verification:**
+- [ ] `node --test tests/e2e.test.js` hijau termasuk test transcript baru
+- [ ] `npm run verify` penuh hijau
+
+**Dependencies:** Task 13b, Task 13c (kontrak + fixture + infra dari keduanya)
+
+**Files likely touched:**
+- `src/youtube-adapter.js` (baru)
+- `tests/e2e.test.js` (+ fixture bila belum ada di Task 13)
+
+**Estimated scope:** Medium (2-3 files)
+
+### Checkpoint: Adapter
+
+- [ ] VideoPayload terkunci dan ter-parse dari fixture asli
+- [ ] Keputusan A-vs-B final (tidak berubah lagi setelah ini; B butuh hook stack
+  yang sengaja tidak dibawa Task 16)
+- [ ] Review human singkat sebelum exporter (kontrak dikunci = Task 15-17 bisa jalan di atasnya)
+
+## Task 15: Exporter video.md + video.json (LLM-ready)
+
+**Description:** `renderVideoMarkdown(payload, url)` + JSON payload di `src/export-html.js` (atau modul
+export baru bila lebih rapi): `# Judul`, link video, durasi, segmen sebagai `[mm:ss] teks` per baris,
+escape benar. Unit test lawan VideoPayload sintetis (timestamp aneh, teks berisi `<>&`, segmen kosong).
+
+**Acceptance criteria:**
+- [ ] MD berisi judul + URL + durasi + semua segmen `[t] teks` berurutan, lolos upload ChatGPT
+  (probe: "bahas bagian menit X" terjawab dengan rujukan menit benar)
+- [ ] Karakter aneh/emoji di-escape, tidak jebol layout; segmen teks kosong di-skip jujur
+- [ ] Unit test hijau (RED dulu)
+
+**Verification:**
+- [ ] `node --test tests/export.test.js` hijau
+- [ ] Manual check: upload MD fixture ke ChatGPT, 1 probe menit terjawab benar
+
+**Dependencies:** Task 14 (kontrak VideoPayload)
+
+**Files likely touched:**
+- `src/export-html.js` (tambah renderVideo*)
+- `tests/export.test.js`
+
+**Estimated scope:** Small-Medium (2 files)
+
+## Task 16: Wiring tab — registry + manifest + content route + background path
+
+**Description:** Daftarkan adapter ketiga di `src/sites/registry.js` (`youtube`, hosts `youtube.com` /
+`youtu.be`, stack `youtube-adapter + jszip + content`, global `XYoutube`). Manifest match
+`youtube.com` (tanpa host blanket, tanpa hook MAIN — transcript DOM-only tidak butuh tangkapan
+network). Content `SCRAPE_START` route `site: "youtube"` → parse sekali, tanpa fetch media.
+Background `downloadVideo()`: validasi envelope (pola `asChapter`), rakit `video.md` + `video.json`,
+BUILD_ZIP di tab, download `<videoid>.zip`.
+
+**Acceptance criteria:**
+- [ ] `detectAdapter("https://www.youtube.com/watch?v=...") === "youtube"`
+- [ ] E2E content: `SCRAPE_START {site:"youtube"}` lawan fixture → `SCRAPE_DONE` berisi
+  chapter... tepatnya `video` payload + tanpa field `media` (tidak ada yang di-fetch)
+- [ ] `manifest.test.js` (bila ada aturan stack) tetap hijau; JSON manifest valid
+- [ ] Jalur X dan O'Reilly tidak regresi (suite penuh hijau)
+
+**Verification:**
+- [ ] `node --test` penuh hijau + `npm run verify` hijau
+- [ ] Load unpacked branch: halaman YouTube tidak console-error (content script ke-inject diam)
+
+**Dependencies:** Task 14, Task 15
+
+**Files likely touched:**
+- `src/sites/registry.js`
+- `manifest.json`
+- `src/content.js` (route + parse sekali)
+- `src/background.js` (`downloadVideo` + `safeVideoId`)
+- `tests/registry.test.js`, `tests/e2e.test.js`, `tests/manifest.test.js`
+
+**Estimated scope:** Medium (4-5 files)
+
+### Checkpoint: Wiring
+
+- [ ] Registry kenal 3 adapter; manifest valid; content route youtube jalan di fixture
+- [ ] Suite penuh hijau, X + O'Reilly tidak regresi
+- [ ] Review human sebelum popup (wiring tab = fondasi UI)
+
+## Task 17: Popup + tests + uji manual video asli
+
+**Description:** Popup deteksi youtube via registry, label tombol "Download transcript", kirim
+`site: "youtube"`, teks hasil `downloaded <id>.zip (N segments)`, `expectedCaps` youtube =
+`["zip"]` (tanpa hook/media/scroller/sheet — stack terkurus). Popup-ui test: routing site +
+ping sehat. Lalu manual di 2 video asli (satu bercaption, satu tanpa caption → error
+EMPTY_TRANSCRIPT eksplisit) + upload MD ke ChatGPT 1 probe menit.
+
+**Acceptance criteria:**
+- [ ] Di video YouTube: tombol "Download transcript", klik → `<videoid>.zip` berisi
+  `video.md` + `video.json` (+ `errors.json` hanya bila relevan)
+- [ ] Check connection di tab YouTube: `connected: true` polos (tanpa warning stale)
+- [ ] Di video tanpa caption: pesan eksplisit (bukan ZIP kosong, bukan hang)
+- [ ] Di situs tak dikenal: pesan unsupported tetap eksplisit
+- [ ] Probe ChatGPT: rujukan menit dari MD benar
+
+**Verification:**
+- [ ] `node --test tests/popup-ui.test.js` hijau (test routing + ping youtube baru)
+- [ ] `npm run verify` penuh hijau
+- [ ] Manual check 2 video asli + 1 probe ChatGPT, catat hasil
+
+**Dependencies:** Task 16
+
+**Files likely touched:**
+- `src/popup.js` (deteksi + label + caps)
+- `tests/popup-ui.test.js`
+- `tasks/todo.md` (centang)
+
+**Estimated scope:** Medium (2-3 files + kerja manual)
+
+### Checkpoint: Complete (Phase 6)
+
+- [ ] Semua acceptance Task 13-17 terpenuhi
+- [ ] MD dari video asli didiskusikan di ChatGPT dengan rujukan menit benar
+- [ ] Jalur X + O'Reilly tidak regresi
+- [ ] Review human; branch tetap pisah sampai diputuskan merge
+
+## Risks and Mitigations (tambahan Phase 6)
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Panel transcript tidak bisa dibuka programmatic / struktur shadow-DOM keras | High | Task 13 go/no-go di depan; fallback plan B (timedtext) sudah disiapkan, STOP + review bila gugur |
+| YouTube ganti layout panel (lebih sering dari X/O'Reilly) | Med | Isolasi selector di `youtube-adapter.js` + fallback multi-selector; error jujur bila panel tak dikenal |
+| Video tanpa caption / caption dimatikan pemilik | Med | Guard EMPTY_TRANSCRIPT eksplisit; bukan ZIP kosong |
+| Bahasa track panel tidak deterministik (multi-bahasa) | Low | Pakai apa adanya + catat `lang` jujur; pilih-pilih bahasa out of scope MVP |
+| Manifest match `youtube.com` ditolak review Web Store (out of scope) | Low | Tetap unpacked-load seperti V1/V2; tanpa host_permissions blanket |
+
+## Open Questions
+
+- ~~Branch dari `experiment/oreilly` (rekomendasi) atau porting plumbing ke `main`?~~
+  Diputus 2026-09-11: branch dari `main`, merge `experiment/oreilly` masuk belakangan (Task 13b).
+- Sinkronkan checkbox Phase 5 di `tasks/plan.md` + `tasks/todo.md` cabang `main` dengan status asli (sudah selesai di `experiment/oreilly`)? Diusulkan: ya, saat Phase 6 mulai, agar plan tidak berbohong.
+- Perlu `hook-main.js` di stack YouTube untuk masa depan (timedtext fallback), atau tetap tanpa hook sampai plan B aktif? Default: tanpa hook.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |

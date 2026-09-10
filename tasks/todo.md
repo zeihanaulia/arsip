@@ -66,6 +66,22 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [ ] Jalur X tidak regresi
 - [ ] Review human sebelum adapter situs ketiga
 
+## Phase 6: V2 adapter ketiga — transcript YouTube (1 video → MD buat LLM)
+
+- [ ] Task 13a: Branch experiment/youtube dari main
+- [ ] Task 13b: Merge experiment/oreilly masuk (mesin multi-site)
+- [ ] Task 13c: Validasi lapangan DOM panel transcript (go/no-go, blocker: observasi user)
+- [ ] Task 14: Adapter YouTube — parse transcript jadi VideoPayload
+- [ ] Task 15: Exporter video.md + video.json (LLM-ready)
+- [ ] Task 16: Wiring tab — registry + manifest + content route + background path
+- [ ] Task 17: Popup + tests + uji manual video asli
+
+## Checkpoint: Complete (Phase 6)
+
+- [ ] MD video asli lolos probe ChatGPT (rujukan menit benar)
+- [ ] Jalur X + O'Reilly tidak regresi
+- [ ] Review human; branch tetap pisah sampai diputuskan merge
+
 ## Backlog (post-V1)
 
 (none)
