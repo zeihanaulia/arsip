@@ -432,6 +432,14 @@ describe("x-adapter (real Chromium)", () => {
 			() => globalThis.XAdapter.findExpandButtons(document).length,
 		);
 		assert.equal(found, 1);
+		const textOnly = await page.evaluate(
+			() => globalThis.XAdapter.findTextExpanders(document).length,
+		);
+		assert.equal(
+			textOnly,
+			1,
+			"sidebar link and outside-article div must never match",
+		);
 		const expanded = await page.evaluate(() => {
 			for (const button of globalThis.XAdapter.findExpandButtons(document)) {
 				button.click();

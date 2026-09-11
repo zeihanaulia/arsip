@@ -230,9 +230,13 @@ function addMedia(media, seen, url, type) {
 
 /**
  * Text-only expanders: truncated tweet bodies use a non-button "Show
- * more" (div/span/a). Exact-text match only, so longer labels (ads,
- * "Show more replies" divs) stay untouched. Clicking these never loads
- * new tweets — safe for viewport-only mode.
+ * more" (div/span inside the article). Three hard rules so a click can
+ * NEVER navigate the tab away (clicking a link mid-scrape aborts the
+ * scrape on the wrong page and orphans Cancel):
+ * - exact text "show more" only (ads and "Show more replies" untouched),
+ * - never a link (a[href] would navigate),
+ * - must sit inside a tweet article (sidebar/footer lookalikes untouched).
+ * Clicking these never loads new tweets — safe for viewport-only mode.
  *
  * @param {ParentNode} [root]
  * @returns {HTMLElement[]}
@@ -240,13 +244,17 @@ function addMedia(media, seen, url, type) {
 function findTextExpanders(root) {
 	const doc = root ?? document;
 	const expanders = [];
-	for (const el of doc.querySelectorAll("div, span, a")) {
+	for (const el of doc.querySelectorAll("div, span")) {
 		if (!(el instanceof HTMLElement) || el.closest("button")) {
 			continue;
 		}
-		if ((el.textContent ?? "").trim().toLowerCase() === "show more") {
-			expanders.push(el);
+		if ((el.textContent ?? "").trim().toLowerCase() !== "show more") {
+			continue;
 		}
+		if (!el.closest('article[data-testid="tweet"]')) {
+			continue;
+		}
+		expanders.push(el);
 	}
 	return expanders;
 }
