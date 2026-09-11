@@ -242,6 +242,22 @@ function smallestMp4(videoInfo) {
 }
 
 /**
+ * Long tweets (>280 chars) truncate `legacy.full_text` — the complete
+ * text lives in `note_tweet.note_tweet_results.result.text`. Prefer it
+ * when present; fall back to legacy otherwise. Empty stays empty, never
+ * guessed.
+ *
+ * @param {Record<string, unknown>} result
+ * @returns {string}
+ */
+function noteTextOf(result) {
+	const note = asRecord(
+		asRecord(asRecord(result.note_tweet).note_tweet_results).result,
+	);
+	return textOf(note.text);
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {ApiTweet | null}
  */
@@ -254,9 +270,10 @@ function parseTweetResult(result) {
 	const user = parseUser(result);
 	const createdAt = Date.parse(textOf(legacy.created_at));
 	const views = /** @type {Record<string, unknown>} */ (result.views ?? {});
+	const note = noteTextOf(result);
 	return {
 		id,
-		text: textOf(legacy.full_text),
+		text: note !== "" ? note : textOf(legacy.full_text),
 		url: user.screenName ? `https://x.com/${user.screenName}/status/${id}` : "",
 		createdAt: Number.isNaN(createdAt) ? "" : new Date(createdAt).toISOString(),
 		user,

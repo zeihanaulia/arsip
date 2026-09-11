@@ -88,6 +88,24 @@ describe("extractRawTweets", () => {
 
 		assert.deepEqual(tweets, []);
 	});
+
+	it("prefers note_tweet full text over truncated legacy text", () => {
+		const notePayload = JSON.parse(
+			readFileSync(
+				join(root, "tests/fixtures/x-tweet-detail-note.json"),
+				"utf8",
+			),
+		);
+		const tweets = extractRawTweets(notePayload);
+		const noteRoot = tweets.find((t) => t.id === "2098232985938194881");
+
+		assert.ok(noteRoot, "root tweet extracted");
+		assert.ok(
+			(noteRoot?.text ?? "").includes("Number one tip: act with agency."),
+			"full note text, not the 279-char legacy truncation",
+		);
+		assert.ok((noteRoot?.text ?? "").length > 1000);
+	});
 });
 
 describe("mergeApiIntoSnapshot", () => {
