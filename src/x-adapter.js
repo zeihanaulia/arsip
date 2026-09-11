@@ -229,11 +229,31 @@ function addMedia(media, seen, url, type) {
 }
 
 /**
+ * Text-only expanders: truncated tweet bodies use a non-button "Show
+ * more" (div/span/a). Exact-text match only, so longer labels (ads,
+ * "Show more replies" divs) stay untouched. Clicking these never loads
+ * new tweets — safe for viewport-only mode.
+ *
+ * @param {ParentNode} [root]
+ * @returns {HTMLElement[]}
+ */
+function findTextExpanders(root) {
+	const doc = root ?? document;
+	const expanders = [];
+	for (const el of doc.querySelectorAll("div, span, a")) {
+		if (!(el instanceof HTMLElement) || el.closest("button")) {
+			continue;
+		}
+		if ((el.textContent ?? "").trim().toLowerCase() === "show more") {
+			expanders.push(el);
+		}
+	}
+	return expanders;
+}
+
+/**
  * Buttons that reveal more of the thread. Text matching is a fallback:
  * X restyles often, but the affordance wording is comparatively stable.
- * Truncated tweet *text* uses a non-button "Show more" (div/span, usually
- * role=button) — exact-text match only, so longer labels (ads, "Show more
- * replies" divs) stay untouched.
  *
  * @param {ParentNode} [root]
  * @returns {HTMLElement[]}
@@ -250,14 +270,7 @@ function findExpandButtons(root) {
 			buttons.push(button);
 		}
 	}
-	for (const el of doc.querySelectorAll("div, span, a")) {
-		if (!(el instanceof HTMLElement) || el.closest("button")) {
-			continue;
-		}
-		if ((el.textContent ?? "").trim().toLowerCase() === "show more") {
-			buttons.push(el);
-		}
-	}
+	buttons.push(...findTextExpanders(doc));
 	return buttons;
 }
 
@@ -293,6 +306,7 @@ function scrapeRaw(doc, pageUrl = "") {
 globalThis.XAdapter = {
 	conversationIdFromUrl,
 	findExpandButtons,
+	findTextExpanders,
 	findTweetElements,
 	parseCount,
 	parseTweet,

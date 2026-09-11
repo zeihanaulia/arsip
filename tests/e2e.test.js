@@ -445,6 +445,66 @@ describe("x-adapter (real Chromium)", () => {
 		);
 	});
 
+	it("scrapes full text viewport-only with zero manual interaction", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-expand-text.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const response = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener(
+					{
+						type: "SCRAPE_START",
+						payload: { autoScroll: false, videoMode: "bundle" },
+					},
+					{},
+					resolve,
+				);
+			});
+		});
+		const payload =
+			/** @type {{ type?: string, payload?: { tweets?: { text?: string }[] } }} */ (
+				response
+			);
+
+		assert.equal(payload.type, "SCRAPE_DONE");
+		assert.ok(
+			(payload.payload?.tweets?.[0]?.text ?? "").includes(
+				"second half after expanding",
+			),
+			"viewport-only scrape must expand text by itself",
+		);
+	});
+
 	it("expands hidden replies until the timeline stops growing", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

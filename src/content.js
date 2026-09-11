@@ -213,6 +213,38 @@ function postProgress(stats) {
  * @param {boolean} skipPromoted Drop paid placements before downloading.
  * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
  */
+/**
+ * Final text-expansion pass: clicks truncated-tweet "Show more" (text
+ * only — never loads new tweets, so viewport-only mode keeps its promise)
+ * and lets the DOM settle before the scrape. Catches stragglers the
+ * batch loop missed (e.g. tweets loaded in the final scroll) and covers
+ * viewport-only mode, which otherwise expands nothing. Zero manual
+ * interaction needed either way.
+ */
+async function expandTextOnly() {
+	try {
+		const adapter =
+			/** @type {{ findTextExpanders?: (doc: Document) => { click: () => void }[] } | undefined} */ (
+				globalThis.XAdapter
+			);
+		for (const el of adapter?.findTextExpanders?.(document) ?? []) {
+			if (cancelRequested) {
+				break;
+			}
+			el.click();
+		}
+	} catch {
+		// Expansion is best-effort; the scrape below reads whatever is there.
+	}
+	await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
+/**
+ * @param {boolean} autoScroll
+ * @param {string} videoMode "bundle" | "separate" | "posters-only".
+ * @param {boolean} skipPromoted Drop paid placements before downloading.
+ * @returns {Promise<{ type: string, payload: Record<string, unknown> }>}
+ */
 async function runScrape(autoScroll, videoMode, skipPromoted) {
 	cancelRequested = false;
 	const scroller = readScroller();
@@ -224,6 +256,7 @@ async function runScrape(autoScroll, videoMode, skipPromoted) {
 			accumulateBatch(collected),
 		);
 	}
+	await expandTextOnly();
 	if (scroller && typeof scroller.mountLazyMedia === "function") {
 		postProgress({ phase: "mounting" });
 		await scroller.mountLazyMedia(document);
@@ -274,9 +307,32 @@ function dropPromoted(tweets, skip) {
 }
 
 /**
- * Unions one DOM scrape into the cross-batch collection (first sighting
- * wins). The timeline virtualizer removes far tweets as you scroll, so
- * the last scrape alone would silently drop everything loaded earlier.
+ * Same tweet re-rendered across batches: keep whichever carries more
+ * text. X only ever changes a tweet's body by truncating or expanding
+ * it, so longer is strictly more complete. Ties keep the earlier
+ * sighting (stable, first-wins).
+ *
+ * @param {{ id?: unknown, text?: unknown } | undefined} prev
+ * @param {{ id?: unknown, text?: unknown }} next
+ * @returns {{ id?: unknown, text?: unknown }} The winner; textless next
+ * still wins when nothing was collected before (first-wins preserved).
+ */
+function preferCompleteTweet(prev, next) {
+	if (prev === undefined) {
+		return next;
+	}
+	const prevLen = typeof prev.text === "string" ? prev.text.length : -1;
+	const nextLen = typeof next.text === "string" ? next.text.length : -1;
+	if (nextLen < 0) {
+		return prev;
+	}
+	return nextLen > prevLen ? next : prev;
+}
+
+/**
+ * Unions one DOM scrape into the cross-batch collection. The timeline
+ * virtualizer removes far tweets as you scroll, so the last scrape alone
+ * would silently drop everything loaded earlier.
  *
  * @param {Map<string, unknown>} collected
  */
@@ -291,10 +347,17 @@ function accumulateBatch(collected) {
 			if (!raw || typeof raw !== "object") {
 				continue;
 			}
-			const id = /** @type {{ id?: unknown }} */ (raw).id;
-			if (typeof id === "string" && id !== "" && !collected.has(id)) {
-				collected.set(id, raw);
+			const item = /** @type {{ id?: unknown, text?: unknown }} */ (raw);
+			if (typeof item.id !== "string" || item.id === "") {
+				continue;
 			}
+			const winner = preferCompleteTweet(
+				/** @type {{ id?: unknown, text?: unknown } | undefined} */ (
+					collected.get(item.id)
+				),
+				item,
+			);
+			collected.set(item.id, winner);
 		}
 	} catch {
 		// A failed batch scrape must not kill the collected tweets.
