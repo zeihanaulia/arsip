@@ -419,6 +419,32 @@ describe("x-adapter (real Chromium)", () => {
 		assert.equal(conversationId, "2096302171243315378");
 	});
 
+	it("expands truncated tweet text via non-button Show more", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-expand-text.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const found = await page.evaluate(
+			() => globalThis.XAdapter.findExpandButtons(document).length,
+		);
+		assert.equal(found, 1);
+		const expanded = await page.evaluate(() => {
+			for (const button of globalThis.XAdapter.findExpandButtons(document)) {
+				button.click();
+			}
+			return document.querySelector("#truncated")?.textContent ?? "";
+		});
+
+		assert.ok(
+			expanded.includes("second half after expanding"),
+			"text expander must be found and clicked",
+		);
+	});
+
 	it("expands hidden replies until the timeline stops growing", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

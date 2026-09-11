@@ -231,9 +231,12 @@ function addMedia(media, seen, url, type) {
 /**
  * Buttons that reveal more of the thread. Text matching is a fallback:
  * X restyles often, but the affordance wording is comparatively stable.
+ * Truncated tweet *text* uses a non-button "Show more" (div/span, usually
+ * role=button) — exact-text match only, so longer labels (ads, "Show more
+ * replies" divs) stay untouched.
  *
  * @param {ParentNode} [root]
- * @returns {HTMLButtonElement[]}
+ * @returns {HTMLElement[]}
  */
 function findExpandButtons(root) {
 	const doc = root ?? document;
@@ -245,6 +248,14 @@ function findExpandButtons(root) {
 			(label.includes("show more") || label.includes("show this thread"))
 		) {
 			buttons.push(button);
+		}
+	}
+	for (const el of doc.querySelectorAll("div, span, a")) {
+		if (!(el instanceof HTMLElement) || el.closest("button")) {
+			continue;
+		}
+		if ((el.textContent ?? "").trim().toLowerCase() === "show more") {
+			buttons.push(el);
 		}
 	}
 	return buttons;

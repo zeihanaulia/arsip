@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Fixture: tweet with truncated text and div Show more</title>
+	</head>
+	<body>
+		<main id="timeline">
+			<article data-testid="tweet">
+				<div data-testid="User-Name">
+					<span>Long Writer</span>
+					<span>@longwriter</span>
+				</div>
+				<div data-testid="tweetText" id="truncated">First half of a long thought</div>
+				<span id="expand-text">Show more</span>
+				<a href="/longwriter/status/2096302171243315380"
+					><time datetime="2026-09-05T18:26:02.000Z">Sep 5</time></a
+				>
+			</article>
+		</main>
+		<script>
+			document.querySelector("#expand-text").addEventListener("click", () => {
+				document.querySelector("#truncated").textContent =
+					"First half of a long thought and the second half after expanding";
+				document.querySelector("#expand-text").remove();
+			});
+		</script>
+	</body>
+</html>
