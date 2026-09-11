@@ -493,4 +493,64 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		assert.equal(await page.textContent("#status"), "connected: true");
 		assert.deepEqual(problems, []);
 	});
+
+	it("reloads a stale tab from Check connection instead of nagging", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") {
+				problems.push(message.text());
+			}
+		});
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			/** @type {number[]} */
+			const reloaded = [];
+			Object.assign(globalThis, {
+				__reloaded: reloaded,
+				chrome: {
+					tabs: {
+						query: async () => [{ id: 7, url: "https://x.com/a/status/1" }],
+						sendMessage: async () => ({
+							type: "PING",
+							payload: {
+								connected: true,
+								caps: { hook: true, media: true, zip: true },
+							},
+						}),
+						reload: async (/** @type {number} */ tabId) => {
+							reloaded.push(tabId);
+						},
+					},
+					runtime: {
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.click("#ping");
+		await page.waitForFunction(
+			() =>
+				document.querySelector("#status")?.textContent?.includes("Reloading"),
+			{ timeout: 15_000 },
+		);
+
+		const reloaded = await page.evaluate(
+			() =>
+				/** @type {number[]} */ (
+					/** @type {{ __reloaded?: unknown }} */ (globalThis).__reloaded ?? []
+				),
+		);
+		assert.deepEqual(reloaded, [7]);
+		assert.deepEqual(problems, []);
+	});
 });

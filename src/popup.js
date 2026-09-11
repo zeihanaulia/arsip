@@ -448,11 +448,30 @@ async function pingContentScript() {
 		if (missing.length === 0) {
 			return "connected: true";
 		}
-		return `connected: true — stale tab, missing: ${missing.join(", ")} (reload the tab)`;
+		return reloadStaleTab(tab.id, missing);
 	} catch (error) {
 		return error instanceof Error
 			? `not reachable: ${error.message}`
 			: "content script not reachable on this page";
+	}
+}
+
+/**
+ * A stale tab means the extension was reloaded after the tab opened
+ * (its content scripts are orphaned). Fix it on the spot instead of
+ * nagging the user to reload manually — no extra permission needed for
+ * tabs.reload. Falls back to the old nag when reload itself fails.
+ *
+ * @param {number} tabId
+ * @param {string[]} missing
+ * @returns {Promise<string>}
+ */
+async function reloadStaleTab(tabId, missing) {
+	try {
+		await chrome.tabs.reload(tabId);
+		return `Reloading the tab to refresh the scraper (was missing: ${missing.join(", ")}) — check again in a few seconds.`;
+	} catch {
+		return `connected: true — stale tab, missing: ${missing.join(", ")} (reload the tab)`;
 	}
 }
 

@@ -27,6 +27,8 @@ Sumber kebenaran: `docs/intent/x-thread-downloader.md` (intent locked), `tasks/p
 
 - Ikuti `tasks/todo.md` berurutan (1→8); setiap task vertical slice, sistem tetap working.
 - Jangan lewati checkpoint: Foundation (Task 2), Capture (Task 4, upload coba ke ChatGPT dulu), Exporters (Task 6), Complete (Task 8).
+- Setiap fix/bugfix dikerjakan di `main` dulu (TDD + verify hijau + commit + push). Baru dibawa ke branch eksperimen (`experiment/*`) via merge `main` → branch. Dilarang fix langsung di branch eksperimen lalu cherry-pick ke main — histori main harus linear dan bersih.
+- Branch eksperimen (`experiment/oreilly`, `experiment/youtube`, ...) tidak di-push kecuali diminta eksplisit.
 - Vendor lokal saja: `vendor/jszip.min.js`, `vendor/xlsx.full.min.js`. Toolchain npm yang disetujui: biome + tsc + types saja. Jangan tambah bundler/dependency runtime tanpa persetujuan (diputus di Task 8).
 - Network check saat scrape: egress hanya ke `x.com` / `pbs.twimg.com` / `video.twimg.com`. Selain itu = bug.
 
