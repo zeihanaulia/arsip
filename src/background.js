@@ -174,6 +174,36 @@ async function downloadThread(options) {
 }
 
 /**
+ * Why a video came back with no segments. The parser already knows
+ * whether this video declares captions, so the two cases get separate
+ * codes: reporting a missed capture as "this video has no captions" is
+ * what made a real bug look like honest-empty.
+ *
+ * @param {{ captionState: "listed" | "absent" | "unknown" }} video
+ * @returns {import("./messaging.js").Message}
+ */
+function emptyTranscriptError(video) {
+	if (video.captionState === "absent") {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "EMPTY_TRANSCRIPT",
+			detail: "This video has no captions.",
+		});
+	}
+	if (video.captionState === "listed") {
+		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+			code: "CAPTURE_MISSED",
+			detail:
+				"This video has captions, but no caption data was captured. Reload the tab, press play with captions on for a few seconds, then try again.",
+		});
+	}
+	return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
+		code: "CAPTURE_UNKNOWN",
+		detail:
+			"No caption or player data was captured. Reload the tab and press play, then try again.",
+	});
+}
+
+/**
  * YouTube path (jalur B): bodies ride from the tab buffer, assembly and
  * rendering happen here, then the tab zips. No scroll, no media bucket,
  * no API merge — one parse, one archive. Same never-rejects contract.
@@ -198,11 +228,7 @@ async function downloadVideo() {
 		sourceUrl,
 	);
 	if (video.segments.length === 0) {
-		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
-			code: "EMPTY_TRANSCRIPT",
-			detail:
-				"No caption segments captured — play the video with captions for a bit, then try again. Some videos have no captions at all.",
-		});
+		return emptyTranscriptError(video);
 	}
 	const files = [
 		{ name: "video.json", text: JSON.stringify(video, null, 2) },

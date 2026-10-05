@@ -10,6 +10,9 @@ import { createThreadSnapshot, createTweet } from "../src/model.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const headed = process.env.HEADED === "1";
+const fixture = JSON.parse(
+	readFileSync(join(root, "tests/fixtures/timedtext-sample.json"), "utf8"),
+);
 
 /**
  * Shape the adapter guarantees at runtime (parseTweet always fills
@@ -18,6 +21,24 @@ const headed = process.env.HEADED === "1";
  *
  * @typedef {{ tweets: { id: string, text: string, user: { screenName: string, name: string }, createdAt: string, metrics: { likes: number, views: number }, media: { url: string, type: string }[] }[] }} ScrapeResult
  */
+
+/**
+ * A timedtext response past the 500KB generic cap: what a two-hour live
+ * stream with auto-captions actually sends. Built in-page-sized pieces
+ * so the fixture never lands in the repo.
+ *
+ * @returns {string}
+ */
+function oversizedCaptionBody() {
+	const events = [];
+	for (let index = 0; index < 6000; index += 1) {
+		events.push({
+			tStartMs: index * 1000,
+			segs: [{ utf8: `line ${index} ${"x".repeat(80)}` }],
+		});
+	}
+	return JSON.stringify({ events });
+}
 
 describe("x-adapter (real Chromium)", () => {
 	it("scrapes the fixture thread end to end", async (t) => {
@@ -996,6 +1017,85 @@ describe("x-adapter (real Chromium)", () => {
 				),
 			);
 		});
+		it("keeps an oversized timedtext body that the generic cap would drop", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.route("**/api/timedtext**", async (route) => {
+				await route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: oversizedCaptionBody(),
+				});
+			});
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/hook-main.js") });
+
+			const entry = await page.evaluate(async () => {
+				/** @type {unknown[]} */
+				const seen = [];
+				window.addEventListener("arsip:net", (event) => {
+					seen.push(/** @type {CustomEvent} */ (event).detail);
+				});
+				await fetch(
+					"https://www.youtube.com/api/timedtext?v=cQWMhMNYllQ&fmt=json3",
+				);
+				await new Promise((resolve) => setTimeout(resolve, 200));
+				return seen[0];
+			});
+
+			// Past the old 500KB generic cap: dropping this body is exactly
+			// what made long videos report "no captions" while captions
+			// were on screen the whole time.
+			assert.equal(
+				/** @type {{ truncated?: unknown }} */ (entry).truncated,
+				false,
+			);
+			const body = /** @type {{ body?: unknown }} */ (entry).body;
+			assert.equal(typeof body, "string");
+			assert.ok(
+				/** @type {string} */ (body).length > 500_000,
+				"oversized caption body must survive intact",
+			);
+		});
+
+		it("still drops an oversized non-caption body to bound the buffer", async (t) => {
+			const browser = await chromium.launch({ headless: !headed });
+			t.after(() => browser.close());
+			const page = await browser.newPage();
+			await page.route("**/api/bigjson**", async (route) => {
+				await route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: oversizedCaptionBody(),
+				});
+			});
+			await page.goto(
+				pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+			);
+			await page.addScriptTag({ path: join(root, "src/hook-main.js") });
+
+			const entry = await page.evaluate(async () => {
+				/** @type {unknown[]} */
+				const seen = [];
+				window.addEventListener("arsip:net", (event) => {
+					seen.push(/** @type {CustomEvent} */ (event).detail);
+				});
+				await fetch("https://www.youtube.com/api/bigjson?x=1");
+				await new Promise((resolve) => setTimeout(resolve, 200));
+				return seen[0];
+			});
+
+			// The generic cap still guards every other endpoint, so one huge
+			// unrelated body cannot grow the capture buffer without bound.
+			assert.equal(
+				/** @type {{ truncated?: unknown }} */ (entry).truncated,
+				true,
+			);
+			assert.equal(/** @type {{ body?: unknown }} */ (entry).body, null);
+		});
 	});
 
 	it("scrolls the inner timeline container, not just the document", async (t) => {
@@ -1272,5 +1372,164 @@ describe("youtube video flow (real Chromium)", () => {
 		assert.equal(payload.payload?.timedBodies?.length, 1);
 		assert.equal(payload.payload?.playerBodies?.length, 1);
 		assert.ok((payload.payload?.sourceUrl ?? "").length > 0);
+	});
+
+	it("skips player heartbeats so the real response survives the cap", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const payload = await page.evaluate(
+			([timed]) => {
+				const realPlayer = JSON.stringify({
+					videoDetails: { videoId: "cQWMhMNYllQ", title: "T" },
+				});
+				// Heartbeats arrive newest and repeat every few seconds.
+				// Positional "newest 3" caps used to hand back only these.
+				for (let index = 0; index < 5; index += 1) {
+					window.dispatchEvent(
+						new CustomEvent("arsip:net", {
+							detail: {
+								url: "/youtubei/v1/player/heartbeat?alt=json",
+								status: 200,
+								mime: "application/json",
+								body: JSON.stringify({ pollDelayMs: 5000 }),
+							},
+						}),
+					);
+				}
+				window.dispatchEvent(
+					new CustomEvent("arsip:net", {
+						detail: {
+							url: "https://www.youtube.com/youtubei/v1/player?key=x",
+							status: 200,
+							mime: "application/json",
+							body: realPlayer,
+						},
+					}),
+				);
+				window.dispatchEvent(
+					new CustomEvent("arsip:net", {
+						detail: {
+							url: "https://www.youtube.com/api/timedtext?v=cQWMhMNYllQ",
+							status: 200,
+							mime: "application/json",
+							body: timed,
+						},
+					}),
+				);
+				const listener =
+					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+						globalThis
+					).__listeners?.[0];
+				if (!listener) {
+					throw new Error("content script did not register a listener");
+				}
+				return new Promise((resolve) => {
+					listener(
+						{ type: "SCRAPE_START", payload: { site: "youtube" } },
+						{},
+						resolve,
+					);
+				});
+			},
+			[JSON.stringify(fixture.timedtext)],
+		);
+
+		const bodies =
+			/** @type {{ payload?: { playerBodies?: string[] } }} */ (payload).payload
+				?.playerBodies ?? [];
+		assert.equal(bodies.length, 1);
+		assert.match(bodies[0], /cQWMhMNYllQ/);
+	});
+
+	it("consumes the capture buffer so a second download starts clean", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		const lengths = await page.evaluate(
+			([timed]) => {
+				window.dispatchEvent(
+					new CustomEvent("arsip:net", {
+						detail: {
+							url: "https://www.youtube.com/api/timedtext?v=cQWMhMNYllQ",
+							status: 200,
+							mime: "application/json",
+							body: timed,
+						},
+					}),
+				);
+				const listener =
+					/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+						globalThis
+					).__listeners?.[0];
+				if (!listener) {
+					throw new Error("content script did not register a listener");
+				}
+				const ask = () =>
+					new Promise((resolve) => {
+						listener(
+							{ type: "SCRAPE_START", payload: { site: "youtube" } },
+							{},
+							resolve,
+						);
+					});
+				return ask().then((first) =>
+					ask().then((second) => [
+						/** @type {{ payload?: { timedBodies?: string[] } }} */ (first)
+							.payload?.timedBodies?.length ?? 0,
+						/** @type {{ payload?: { timedBodies?: string[] } }} */ (second)
+							.payload?.timedBodies?.length ?? 0,
+					]),
+				);
+			},
+			[JSON.stringify(fixture.timedtext)],
+		);
+
+		// The X path clears netLog after consuming it (consume-then-clear);
+		// the YouTube path must not leak the previous video's captions into
+		// the next download.
+		assert.deepEqual(lengths, [1, 0]);
 	});
 });

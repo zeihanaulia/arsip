@@ -553,4 +553,63 @@ describe("popup UI (stubbed chrome APIs)", () => {
 		assert.deepEqual(reloaded, [7]);
 		assert.deepEqual(problems, []);
 	});
+
+	it("shows the real reason a transcript download failed", async (t) => {
+		const browser = await chromium.launch({
+			headless: !headed,
+			args: ["--allow-file-access-from-files"],
+		});
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		const /** @type {string[]} */ problems = [];
+		page.on("pageerror", (error) => {
+			problems.push(String(error));
+		});
+		await page.addInitScript(() => {
+			Object.assign(globalThis, {
+				chrome: {
+					tabs: {
+						query: async () => [
+							{ id: 3, url: "https://www.youtube.com/watch?v=cQWMhMNYllQ" },
+						],
+						sendMessage: async () => ({
+							type: "PING",
+							payload: { connected: true, caps: { hook: true, zip: true } },
+						}),
+					},
+					runtime: {
+						sendMessage: async () => ({
+							type: "SCRAPE_PROGRESS",
+							payload: {
+								phase: "done",
+								result: {
+									type: "SCRAPE_ERROR",
+									payload: {
+										code: "CAPTURE_MISSED",
+										detail:
+											"This video has captions, but no caption data was captured. Reload the tab, press play with captions on for a few seconds, then try again.",
+									},
+								},
+							},
+						}),
+					},
+				},
+			});
+		});
+		await page.goto(pathToFileURL(join(root, "src/popup.html")).href);
+
+		await page.click("#download");
+		await page.waitForFunction(
+			() =>
+				/reload/i.test(document.querySelector("#status")?.textContent ?? ""),
+			{ timeout: 15_000 },
+		);
+
+		// The actionable sentence replaces the raw JSON blob: a user who
+		// hits this needs to know what to do, not what the enum was called.
+		const status = (await page.textContent("#status")) ?? "";
+		assert.doesNotMatch(status, /\{"/);
+		assert.match(status, /reload the tab/i);
+		assert.deepEqual(problems, []);
+	});
 });

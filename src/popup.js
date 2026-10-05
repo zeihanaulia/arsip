@@ -320,11 +320,28 @@ async function fetchStatus() {
 }
 
 /**
+ * Failure text for the status line. A known code with a detail reads as
+ * a sentence; anything else falls back to the raw payload so an unknown
+ * code still shows something debuggable instead of a blank line.
+ *
+ * @param {Record<string, unknown> | undefined} payload
+ * @returns {string}
+ */
+function errorText(payload) {
+	const code = payload?.code;
+	const detail = payload?.detail;
+	if (typeof code === "string" && typeof detail === "string" && detail !== "") {
+		return detail;
+	}
+	return `failed: ${JSON.stringify(payload ?? {})}`;
+}
+
+/**
  * @param {{ type?: string, payload?: Record<string, unknown> }} result
  */
 function renderResult(result) {
 	if (result.type !== MESSAGE_TYPES.SCRAPE_DONE) {
-		setStatus(`failed: ${JSON.stringify(result.payload)}`);
+		setStatus(errorText(result.payload));
 		return;
 	}
 	const payload = result.payload ?? {};

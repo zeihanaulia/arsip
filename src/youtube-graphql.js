@@ -166,6 +166,10 @@ export function extractVideoMeta(body) {
  * @property {number} durationSeconds
  * @property {string} lang Manual track language first, else first track, else "".
  * @property {VideoSegment[]} segments In capture order, never re-sorted.
+ * @property {"listed" | "absent" | "unknown"} captionState Whether this
+ *   video declares captions at all. "unknown" means no player response for
+ *   this video was ever captured — it must never be read as "this video
+ *   has no captions", or a missed capture hides behind an honest-empty.
  */
 
 /**
@@ -184,9 +188,50 @@ function videoIdFromUrl(url) {
 }
 
 /**
+ * Everything one player response can tell us about a video. Kept as one
+ * concept so callers never re-derive "did we actually see this video's
+ * player body" from scattered flags.
+ *
+ * @typedef {Object} PlayerContext
+ * @property {VideoMeta} meta
+ * @property {VideoTrack[]} tracks
+ * @property {"listed" | "absent"} captionState "listed" when the player
+ *   declares tracks, "absent" when this video's response has a captions
+ *   block with none.
+ */
+
+/**
+ * Reads the player response for one specific video. YouTube answers the
+ * same endpoint for other reasons — heartbeats carry no videoDetails at
+ * all — and the buffer can still hold another page's response, so a body
+ * only counts when its own videoId matches the page. Null means nothing
+ * in the capture describes this video, which callers must report as
+ * unknown rather than as "this video has no captions".
+ *
+ * @param {unknown} players Newest-first /youtubei/v1/player bodies.
+ * @param {string} wantedId Watch id from the page URL, "" when unknown.
+ * @returns {PlayerContext | null}
+ */
+function playerContext(players, wantedId) {
+	for (const body of Array.isArray(players) ? players : []) {
+		const meta = extractVideoMeta(body);
+		if (meta.videoId === "" || meta.videoId !== wantedId) {
+			continue;
+		}
+		const tracks = extractTracks(body);
+		return {
+			meta,
+			tracks,
+			captionState: tracks.length > 0 ? "listed" : "absent",
+		};
+	}
+	return null;
+}
+
+/**
  * Assembles one payload from captured buffers. First timed body with real
  * segments wins (newest capture first — mirrors timelineApiBodies order);
- * meta and tracks come from the first player body with an identity.
+ * meta, tracks, and captionState come from this page's own player body.
  * Missing pieces stay empty, never guessed.
  *
  * @param {unknown} timedBodies Newest-first /api/timedtext bodies.
@@ -195,33 +240,24 @@ function videoIdFromUrl(url) {
  * @returns {VideoPayload}
  */
 export function assembleVideoPayload(timedBodies, playerBodies, url) {
-	const timed = Array.isArray(timedBodies) ? timedBodies : [];
-	const players = Array.isArray(playerBodies) ? playerBodies : [];
 	let segments = /** @type {VideoSegment[]} */ ([]);
-	for (const body of timed) {
+	for (const body of Array.isArray(timedBodies) ? timedBodies : []) {
 		const parsed = extractSegments(body);
 		if (parsed.length > 0) {
 			segments = parsed;
 			break;
 		}
 	}
-	let meta = extractVideoMeta("");
-	let tracks = /** @type {VideoTrack[]} */ ([]);
-	for (const body of players) {
-		const candidate = extractVideoMeta(body);
-		if (candidate.videoId !== "") {
-			meta = candidate;
-			tracks = extractTracks(body);
-			break;
-		}
-	}
+	const context = playerContext(playerBodies, videoIdFromUrl(url));
+	const tracks = context?.tracks ?? [];
 	const manual = tracks.find((track) => track.kind !== "asr");
 	return {
-		videoId: videoIdFromUrl(url) || meta.videoId,
-		title: meta.title,
+		videoId: videoIdFromUrl(url) || context?.meta.videoId || "",
+		title: context?.meta.title ?? "",
 		url: typeof url === "string" ? url : "",
-		durationSeconds: meta.durationSeconds,
+		durationSeconds: context?.meta.durationSeconds ?? 0,
 		lang: manual?.languageCode ?? tracks[0]?.languageCode ?? "",
 		segments,
+		captionState: context?.captionState ?? "unknown",
 	};
 }

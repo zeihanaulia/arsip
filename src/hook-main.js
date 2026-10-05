@@ -11,6 +11,14 @@
 
 const ARSIP_NET_EVENT = "arsip:net";
 const MAX_BODY_LENGTH = 500_000;
+/**
+ * Caption bodies are the one response that grows with video length: a
+ * two-hour live stream sends megabytes of json3 events, and dropping it
+ * is what turned "captions exist" into "no captions". Caption endpoints
+ * get their own budget; every other endpoint keeps the generic cap so a
+ * single huge unrelated body still cannot grow the buffer without bound.
+ */
+const MAX_CAPTION_BODY_LENGTH = 8_000_000;
 
 // Presence marker as shared DOM state (attributes cross isolated
 // worlds; JS expando properties do not). Read by capabilities() in
@@ -24,6 +32,20 @@ const MAX_BODY_LENGTH = 500_000;
 		document.addEventListener("DOMContentLoaded", apply, { once: true });
 	}
 })();
+
+/**
+ * Per-endpoint body budget. Long videos legitimately exceed the generic
+ * cap, so dropping the body there would report a captioned video as
+ * captionless.
+ *
+ * @param {string} url
+ * @returns {number}
+ */
+function bodyCapFor(url) {
+	return url.includes("/api/timedtext")
+		? MAX_CAPTION_BODY_LENGTH
+		: MAX_BODY_LENGTH;
+}
 
 /**
  * @param {string} url
@@ -60,7 +82,7 @@ function maybeEmit(url, status, rawMime, text, via) {
 		emitNetEntry(url, status, mime, null, false, via);
 		return;
 	}
-	if (text.length > MAX_BODY_LENGTH) {
+	if (text.length > bodyCapFor(url)) {
 		emitNetEntry(url, status, mime, null, true, via);
 		return;
 	}

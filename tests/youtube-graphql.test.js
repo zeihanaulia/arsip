@@ -149,3 +149,102 @@ describe("assembleVideoPayload", () => {
 		assert.equal(video.videoId, "cQWMhMNYllQ");
 	});
 });
+
+/**
+ * Heartbeat responses share the player endpoint but carry no
+ * videoDetails at all. They must never pass for a player body that
+ * declares this video has no captions — that distinction is the whole
+ * point of captionState.
+ *
+ * @returns {string}
+ */
+function heartbeatBody() {
+	return JSON.stringify({
+		playabilityStatus: { status: "OK" },
+		pollDelayMs: 5000,
+	});
+}
+
+describe("assembleVideoPayload captionState", () => {
+	const url = "https://www.youtube.com/watch?v=cQWMhMNYllQ";
+	const playerBody = JSON.stringify({
+		videoDetails: fixture.videoDetails,
+		captions: {
+			playerCaptionsTracklistRenderer: { captionTracks: fixture.captionTracks },
+		},
+	});
+	const noCaptionsBody = JSON.stringify({
+		videoDetails: fixture.videoDetails,
+	});
+
+	it("reports listed when the player declares tracks but no body arrived", () => {
+		const video = assembleVideoPayload([], [playerBody], url);
+
+		assert.equal(video.captionState, "listed");
+		assert.deepEqual(video.segments, []);
+	});
+
+	it("reports absent only when a matching player body has no tracks", () => {
+		const video = assembleVideoPayload([], [noCaptionsBody], url);
+
+		assert.equal(video.captionState, "absent");
+	});
+
+	it("reports unknown for heartbeat-only bodies instead of absent", () => {
+		const video = assembleVideoPayload(
+			[],
+			[heartbeatBody(), heartbeatBody(), heartbeatBody()],
+			url,
+		);
+
+		assert.equal(video.captionState, "unknown");
+		assert.equal(video.title, "");
+	});
+
+	it("reports unknown when no player body was captured at all", () => {
+		assert.equal(assembleVideoPayload([], [], url).captionState, "unknown");
+	});
+});
+
+describe("assembleVideoPayload player body selection", () => {
+	const url = "https://www.youtube.com/watch?v=cQWMhMNYllQ";
+	const otherVideo = JSON.stringify({
+		videoDetails: {
+			...fixture.videoDetails,
+			videoId: "AAAAAAAAAAA",
+			title: "other",
+		},
+		captions: {
+			playerCaptionsTracklistRenderer: { captionTracks: fixture.captionTracks },
+		},
+	});
+	const matching = JSON.stringify({
+		videoDetails: fixture.videoDetails,
+		captions: {
+			playerCaptionsTracklistRenderer: { captionTracks: fixture.captionTracks },
+		},
+	});
+
+	it("skips heartbeats and other videos to find this page's player body", () => {
+		// Newest-first, exactly what the tab forwards: heartbeats arrive
+		// after the real response and must not crowd it out.
+		const video = assembleVideoPayload(
+			[],
+			[heartbeatBody(), heartbeatBody(), heartbeatBody(), matching, otherVideo],
+			url,
+		);
+
+		assert.equal(video.captionState, "listed");
+		assert.equal(video.title, fixture.videoDetails.title);
+		assert.equal(video.durationSeconds, 1155);
+	});
+
+	it("never borrows metadata from a different video", () => {
+		const video = assembleVideoPayload([], [otherVideo], url);
+
+		assert.equal(video.title, "");
+		assert.equal(video.durationSeconds, 0);
+		assert.equal(video.captionState, "unknown");
+		assert.equal(video.videoId, "cQWMhMNYllQ");
+	});
+});

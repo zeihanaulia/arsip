@@ -145,25 +145,50 @@ function scrapeVideoBodies() {
 		if (typeof entry.url !== "string" || typeof entry.body !== "string") {
 			continue;
 		}
-		if (
-			entry.url.includes("/api/timedtext") &&
-			entry.body !== "" &&
-			timedBodies.length < 3
-		) {
-			timedBodies.push(entry.body);
-		} else if (
-			entry.url.includes("/youtubei/v1/player") &&
-			entry.body !== "" &&
-			playerBodies.length < 3
-		) {
-			playerBodies.push(entry.body);
+		const body = entry.body;
+		if (body === "") {
+			continue;
+		}
+		if (isCaptionEndpoint(entry.url) && timedBodies.length < 3) {
+			timedBodies.push(body);
+		} else if (isPlayerEndpoint(entry.url) && playerBodies.length < 3) {
+			playerBodies.push(body);
 		}
 	}
+	// Consume-then-clear, same contract as the X path: bodies captured
+	// while the user watched must never leak into the next download.
+	netLog.length = 0;
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		timedBodies,
 		playerBodies,
 		sourceUrl: location.href,
 	});
+}
+
+/**
+ * `/api/timedtext` — the caption body the parser reads segments from.
+ *
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isCaptionEndpoint(url) {
+	return url.includes("/api/timedtext");
+}
+
+/**
+ * `/youtubei/v1/player`, excluding `/youtubei/v1/player/heartbeat`.
+ * Heartbeats share the prefix but carry no videoDetails, and they repeat
+ * every few seconds while playing, so a positional "newest N" cap would
+ * hand back heartbeats and crowd out the one real response.
+ *
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isPlayerEndpoint(url) {
+	return (
+		url.includes("/youtubei/v1/player") &&
+		!url.includes("/youtubei/v1/player/heartbeat")
+	);
 }
 
 /**
