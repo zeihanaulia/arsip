@@ -122,6 +122,44 @@ describe("renderThreadMarkdown", () => {
 	});
 });
 
+describe("article export", () => {
+	function articleSnapshot() {
+		const root = createTweet({
+			id: "2108213283144810958",
+			text: "# The Infinite SaaS Factory\n\nThe opportunity is to reinvent systems of record.",
+			url: "https://x.com/satyanadella/status/2108213283144810958",
+			createdAt: "2026-10-08T12:00:00.000Z",
+			user: { screenName: "satyanadella", name: "Satya Nadella" },
+			isArticle: true,
+			article: {
+				title: "The Infinite SaaS Factory",
+				text: "The opportunity is to reinvent systems of record.",
+			},
+		});
+		return createThreadSnapshot({
+			sourceUrl: root.url,
+			scrapedAt: "2026-10-09T08:46:56.840Z",
+			tweets: [root],
+		});
+	}
+
+	it("marks the article root and keeps the body in Markdown", () => {
+		const md = renderThreadMarkdown(articleSnapshot());
+
+		assert.ok(md.includes("_X Article_"));
+		assert.ok(md.includes("# The Infinite SaaS Factory"));
+		assert.ok(md.includes("reinvent systems of record"));
+	});
+
+	it("marks the article root in HTML without leaking markup", () => {
+		const html = renderThreadHtml(articleSnapshot());
+
+		assert.ok(html.includes("X Article"));
+		assert.ok(html.includes("reinvent systems of record"));
+		assert.ok(!html.includes("<script"), "no script tags allowed");
+	});
+});
+
 describe("renderVideoMarkdown", () => {
 	const video = {
 		videoId: "w9FGJ4x_VI0",

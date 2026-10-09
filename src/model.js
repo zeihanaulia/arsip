@@ -43,9 +43,16 @@
  */
 
 /**
+ * @typedef {Object} TweetArticle
+ * @property {string} title Article title.
+ * @property {string} text Body rendered to Markdown-ish text (headings, links, media).
+ * @property {string} [coverUrl] Cover image original URL, when the payload carries it.
+ */
+
+/**
  * @typedef {Object} Tweet
  * @property {string} id
- * @property {string} text
+ * @property {string} text Full text. For an article root this carries the rendered article body.
  * @property {string} url
  * @property {string} createdAt ISO timestamp, "" when the DOM hides it.
  * @property {TweetUser} user
@@ -55,6 +62,8 @@
  * @property {string} conversationId
  * @property {boolean} inferred True when order/relation was derived from DOM order, not explicit data.
  * @property {boolean} [promoted] Paid placement (analytics URL or ad badge).
+ * @property {boolean} [isArticle] True for a long-form X Article root.
+ * @property {TweetArticle} [article] Article body, present only when isArticle.
  * @property {string} [language] API-only (no DOM source).
  * @property {boolean} [favorited] API-only viewer relation.
  * @property {boolean} [retweeted] API-only viewer relation.
@@ -96,7 +105,7 @@ export function createTweet(partial = {}) {
 		throw new Error("createTweet requires a non-empty id");
 	}
 	const { user = {}, metrics = {}, media = [] } = partial;
-	return {
+	const tweet = /** @type {Tweet} */ ({
 		id,
 		text: partial.text ?? "",
 		url: partial.url ?? "",
@@ -108,7 +117,21 @@ export function createTweet(partial = {}) {
 		user: { id: "", name: "", screenName: "", avatarUrl: "", ...user },
 		media: [...media],
 		metrics: { ...zeroMetrics(), ...metrics },
-	};
+	});
+	if (partial.isArticle === true) {
+		tweet.isArticle = true;
+	}
+	if (partial.article) {
+		tweet.isArticle = true;
+		tweet.article = {
+			title: partial.article.title ?? "",
+			text: partial.article.text ?? "",
+			...(partial.article.coverUrl
+				? { coverUrl: partial.article.coverUrl }
+				: {}),
+		};
+	}
+	return tweet;
 }
 
 /**

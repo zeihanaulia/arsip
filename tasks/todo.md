@@ -84,6 +84,11 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 - [x] Jalur X tidak regresi (135/135 hijau)
 - [ ] Review human; branch tetap pisah sampai diputuskan merge
 
+## Phase 7: X Article (long-form) sebagai root thread
+
+- [x] Task 18: Tangkap X Article (network `article_results` + reader DOM) jadi root tweet
+- [ ] Checkpoint: X Article — manual E2E di thread artikel asli + review human
+
 ## Backlog (post-V1)
 
 (none)

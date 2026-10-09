@@ -11,6 +11,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const payload = JSON.parse(
 	readFileSync(join(root, "tests/fixtures/x-tweet-detail.json"), "utf8"),
 );
+const articlePayload = JSON.parse(
+	readFileSync(join(root, "tests/fixtures/x-article-detail.json"), "utf8"),
+);
 
 describe("extractRawTweets", () => {
 	it("reads root plus thread items from a real TweetDetail payload", () => {
@@ -190,5 +193,110 @@ describe("mergeApiIntoSnapshot", () => {
 
 		const ids = merged.tweets.map((t) => t.id);
 		assert.equal(ids.length, new Set(ids).size);
+	});
+});
+
+describe("extractRawTweets — X Article", () => {
+	function articleRoot() {
+		const article = extractRawTweets(articlePayload).find(
+			(tweet) => tweet.isArticle,
+		);
+		assert.ok(article, "article root extracted");
+		return article;
+	}
+
+	it("reads title and cover from article.article_results.result", () => {
+		const article = articleRoot();
+
+		assert.ok(article.article, "article metadata present");
+		assert.equal(article.id, "2108213283144810958");
+		assert.equal(article.article.title, "The Infinite SaaS Factory");
+		assert.equal(
+			article.article.coverUrl,
+			"https://pbs.twimg.com/media/ARTICLE_COVER.jpg",
+		);
+	});
+
+	it("renders headings, lists, quotes, links and media to body text", () => {
+		const article = articleRoot();
+		assert.ok(article.article, "article metadata present");
+		const body = article.article.text;
+
+		assert.ok(
+			body.startsWith("The opportunity is to reinvent"),
+			"leading title block dropped, body leads",
+		);
+		assert.ok(body.includes("## Why it matters"), "h2 kept");
+		assert.ok(body.includes("- Agents need a substrate"), "list item kept");
+		assert.ok(
+			body.includes("> Software eats the world; agents eat software."),
+			"blockquote kept",
+		);
+		assert.ok(
+			body.includes("[here](https://example.com/infinite)"),
+			"link entity rendered",
+		);
+		assert.ok(
+			body.includes("![image](https://pbs.twimg.com/media/ARTICLE_BODY.jpg)"),
+			"atomic media rendered in place",
+		);
+	});
+
+	it("puts the full article on tweet.text with the title exactly once", () => {
+		const article = articleRoot();
+
+		assert.ok(article.text.startsWith("# The Infinite SaaS Factory\n\n"));
+		assert.equal(
+			article.text.match(/# The Infinite SaaS Factory/g)?.length,
+			1,
+			"title repeated",
+		);
+	});
+
+	it("collects article media so it can be downloaded locally", () => {
+		const urls = articleRoot().media.map((item) => item.url);
+
+		assert.ok(urls.includes("https://pbs.twimg.com/media/ARTICLE_COVER.jpg"));
+		assert.ok(urls.includes("https://pbs.twimg.com/media/ARTICLE_BODY.jpg"));
+	});
+
+	it("does not mark a plain reply as an article", () => {
+		const reply = extractRawTweets(articlePayload).find(
+			(tweet) => tweet.id === "2108317616569831556",
+		);
+		assert.ok(reply, "reply extracted");
+
+		assert.equal(reply.isArticle, false);
+		assert.equal(reply.article, undefined);
+		assert.equal(reply.replyTo, "2108213283144810958");
+	});
+});
+
+describe("mergeApiIntoSnapshot — X Article", () => {
+	it("appends the article root the DOM never captured", () => {
+		const snapshot = assembleSnapshot(
+			[
+				{
+					id: "2108317616569831556",
+					text: "reply only",
+					url: "https://x.com/Aaronontheweb/status/2108317616569831556",
+				},
+			],
+			"https://x.com/satyanadella/status/2108213283144810958",
+		);
+
+		const merged = mergeApiIntoSnapshot(
+			snapshot,
+			extractRawTweets(articlePayload),
+		);
+
+		const rootTweet = merged.tweets.find(
+			(tweet) => tweet.id === "2108213283144810958",
+		);
+		assert.ok(rootTweet, "article root appended");
+		assert.equal(rootTweet.isArticle, true);
+		assert.ok(rootTweet.article, "article metadata present");
+		assert.ok(rootTweet.article.text.includes("## Why it matters"));
+		assert.ok(rootTweet.text.startsWith("# The Infinite SaaS Factory"));
 	});
 });

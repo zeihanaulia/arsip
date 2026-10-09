@@ -43,6 +43,10 @@ Video yang tidak bisa diambil bytes-nya (stream/blob player) dicatat jujur di ma
 - Video HLS/blob player X tidak bisa di-fetch jadi file — poster + URL + alasan dicatat (rencana jangka panjang: backlog B1 intersepsi network).
 - Caption video hanya kalau DOM menyediakannya (`<track>`); umumnya tidak ada di X.
 - Thread raksasa dibatasi (40 batch / 300 tweet / ~21MB per file media).
+- X Article (long-form) didukung: body root di-render dari payload GraphQL
+  `article.article_results.result` dan/atau reader DOM. Kalau network dump tidak
+  tertangkap dan reader belum ter-mount, root artikel tidak masuk — cek warning
+  "Root tweet not captured" di popup.
 
 ## Develop
 

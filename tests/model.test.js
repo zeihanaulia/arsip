@@ -42,6 +42,24 @@ describe("createTweet", () => {
 		assert.throws(() => createTweet({}), /id/);
 		assert.throws(() => createTweet({ id: "" }), /id/);
 	});
+
+	it("carries an article body and flags the tweet as an article", () => {
+		const tweet = createTweet({
+			id: "123",
+			text: "# Title\n\nBody",
+			article: { title: "Title", text: "Body" },
+		});
+
+		assert.equal(tweet.isArticle, true);
+		assert.deepEqual(tweet.article, { title: "Title", text: "Body" });
+	});
+
+	it("leaves plain tweets without article fields", () => {
+		const tweet = createTweet({ id: "123" });
+
+		assert.equal(tweet.isArticle, undefined);
+		assert.equal(tweet.article, undefined);
+	});
 });
 
 describe("createThreadSnapshot", () => {

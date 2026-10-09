@@ -15,6 +15,8 @@
  * @property {{ url: string, type: string }[]} [media]
  * @property {{ replies?: number, reposts?: number, likes?: number, views?: number }} [metrics]
  * @property {boolean} [promoted]
+ * @property {boolean} [isArticle]
+ * @property {{ title: string, text: string, coverUrl?: string }} [article]
  */
 
 const SELECTORS = {
@@ -24,7 +26,30 @@ const SELECTORS = {
 	time: ["time"],
 	statusLink: ['a[href*="/status/"]'],
 	labeled: ["[aria-label]"],
+	articleReader: ['[data-testid="twitterArticleReadView"]'],
+	articleTitle: [
+		'[data-testid="twitter-article-title"]',
+		'[data-testid="articleTitle"]',
+		'h1[dir="ltr"]',
+		"h1",
+	],
+	articleRichText: ['[data-testid="twitterArticleRichTextView"]'],
 };
+
+/**
+ * DraftJS blocks X renders inside an article reader. Class-name matches
+ * are deliberately loose (`longform-header-*`) because the tag X uses
+ * has changed between releases.
+ */
+const ARTICLE_BLOCK_SELECTOR = [
+	"div.longform-unstyled",
+	"blockquote.longform-blockquote",
+	"[class*='longform-header-one']",
+	"[class*='longform-header-two']",
+	"[class*='longform-header-three']",
+	"[class*='longform-unordered-list']",
+	"[class*='longform-ordered-list']",
+].join(",");
 /**
  * @param {ParentNode} root
  * @param {string[]} selectors Fallbacks, first hit wins.
@@ -127,7 +152,7 @@ function isPromoted(article, href) {
 }
 
 /**
- * @param {Element} article
+ * @param {ParentNode} article
  * @returns {{ name: string, screenName: string, avatarUrl: string }}
  */
 function parseUser(article) {
@@ -145,7 +170,7 @@ function parseUser(article) {
 }
 
 /**
- * @param {Element} article
+ * @param {ParentNode} article
  * @returns {{ replies: number, reposts: number, likes: number, views: number }}
  */
 function parseMetrics(article) {
@@ -229,6 +254,225 @@ function addMedia(media, seen, url, type) {
 }
 
 /**
+ * Status id from a thread page URL: `/status/<id>` first (the canonical
+ * post id), then `/article/<id>` (reader view). "" when neither.
+ *
+ * @param {string} pageUrl
+ * @returns {string}
+ */
+function articleIdFromUrl(pageUrl) {
+	return (
+		/\/status\/(\d+)/.exec(pageUrl ?? "")?.[1] ??
+		/\/article\/(\d+)/.exec(pageUrl ?? "")?.[1] ??
+		""
+	);
+}
+
+/**
+ * @param {Element} reader
+ * @returns {string}
+ */
+function articleTitleDom(reader) {
+	return (queryFirst(reader, SELECTORS.articleTitle)?.textContent ?? "").trim();
+}
+
+/**
+ * One DraftJS block to one Markdown line. Unknown block types stay
+ * plain so formatting is never invented.
+ *
+ * @param {Element} block
+ * @returns {string}
+ */
+function articleBlockMarkdown(block) {
+	const text = (block.textContent ?? "").trim();
+	if (text === "") {
+		return "";
+	}
+	const className = block.getAttribute("class") ?? "";
+	if (className.includes("header-one") || block.tagName === "H1") {
+		return `# ${text}`;
+	}
+	if (className.includes("header-two")) {
+		return `## ${text}`;
+	}
+	if (className.includes("header-three")) {
+		return `### ${text}`;
+	}
+	if (block.tagName === "BLOCKQUOTE" || className.includes("blockquote")) {
+		return text
+			.split("\n")
+			.map((line) => `> ${line}`)
+			.join("\n");
+	}
+	if (className.includes("unordered-list")) {
+		return `- ${text}`;
+	}
+	if (className.includes("ordered-list")) {
+		return `1. ${text}`;
+	}
+	return text;
+}
+
+/**
+ * Article body from the rendered reader. Prefers the DraftJS blocks so
+ * headings/quotes survive; falls back to the rich-text node's text.
+ * A leading block that merely repeats the title is dropped.
+ *
+ * @param {Element} reader
+ * @returns {string}
+ */
+function articleBodyDom(reader) {
+	const rich = queryFirst(reader, SELECTORS.articleRichText) ?? reader;
+	const blocks = [...rich.querySelectorAll(ARTICLE_BLOCK_SELECTOR)];
+	if (blocks.length === 0) {
+		return (rich.textContent ?? "").trim();
+	}
+	const title = articleTitleDom(reader);
+	const lines = [];
+	for (const [index, block] of blocks.entries()) {
+		const line = articleBlockMarkdown(block);
+		if (line === "") {
+			continue;
+		}
+		if (index === 0 && line.replace(/^#\s*/, "") === title) {
+			continue;
+		}
+		lines.push(line);
+	}
+	return lines.join("\n\n");
+}
+
+/**
+ * The X Article reader, when the open page renders one. Returns null on
+ * any page without a reader so thread scraping stays untouched.
+ *
+ * @param {ParentNode} doc
+ * @param {string} pageUrl
+ * @returns {RawTweet | null}
+ */
+function parseArticleDom(doc, pageUrl) {
+	const reader = queryFirst(doc, SELECTORS.articleReader);
+	if (!reader) {
+		return null;
+	}
+	const id = articleIdFromUrl(pageUrl);
+	if (id === "") {
+		return null;
+	}
+	const title = articleTitleDom(reader);
+	const body = articleBodyDom(reader);
+	const user = parseUser(doc);
+	const url = user.screenName
+		? `https://x.com/${user.screenName}/status/${id}`
+		: (pageUrl ?? "").split(/[?#]/)[0];
+	return {
+		id,
+		url,
+		text: title === "" ? body : `# ${title}\n\n${body}`,
+		user,
+		media: collectMedia(reader),
+		metrics: parseMetrics(reader),
+		promoted: false,
+		isArticle: true,
+		article: { title, text: body },
+	};
+}
+
+/**
+ * Fills missing user fields from `extra`, keeping `base` otherwise.
+ *
+ * @param {{ id?: string, name?: string, screenName?: string, avatarUrl?: string } | undefined} base
+ * @param {{ id?: string, name?: string, screenName?: string, avatarUrl?: string } | undefined} extra
+ * @returns {{ id: string, name: string, screenName: string, avatarUrl: string }}
+ */
+function mergeUserFields(base, extra) {
+	const merged = {
+		id: "",
+		name: "",
+		screenName: "",
+		avatarUrl: "",
+		...(base ?? {}),
+	};
+	/** @type {("id" | "name" | "screenName" | "avatarUrl")[]} */
+	const keys = ["id", "name", "screenName", "avatarUrl"];
+	for (const key of keys) {
+		const value = extra?.[key];
+		if (typeof value === "string" && value !== "") {
+			merged[key] = value;
+		}
+	}
+	return merged;
+}
+
+/**
+ * @param {{ url: string, type: string }[] | undefined} base
+ * @param {{ url: string, type: string }[] | undefined} extra
+ * @returns {{ url: string, type: string }[]}
+ */
+function unionMedia(base, extra) {
+	const seen = new Set();
+	const media = [];
+	for (const item of [...(base ?? []), ...(extra ?? [])]) {
+		if (item?.url && !seen.has(item.url)) {
+			seen.add(item.url);
+			media.push(item);
+		}
+	}
+	return media;
+}
+
+/**
+ * Counts on a re-render can be missing; the higher sighting wins so a
+ * duplicate cell never erases metrics the first one carried.
+ *
+ * @param {{ replies?: number, reposts?: number, likes?: number, views?: number } | undefined} base
+ * @param {{ replies?: number, reposts?: number, likes?: number, views?: number } | undefined} extra
+ * @returns {{ replies: number, reposts: number, likes: number, views: number }}
+ */
+function mergeMetrics(base, extra) {
+	const merged = {
+		replies: 0,
+		reposts: 0,
+		likes: 0,
+		views: 0,
+		...(base ?? {}),
+	};
+	/** @type {("replies" | "reposts" | "likes" | "views")[]} */
+	const keys = ["replies", "reposts", "likes", "views"];
+	for (const key of keys) {
+		const value = extra?.[key];
+		if (typeof value === "number" && value > merged[key]) {
+			merged[key] = value;
+		}
+	}
+	return merged;
+}
+
+/**
+ * Two sightings of one tweet (e.g. the article reader and its tweet
+ * cell): longest text wins, richer user/media/metrics fill the gaps.
+ *
+ * @param {RawTweet} base
+ * @param {RawTweet} extra
+ * @returns {RawTweet}
+ */
+function mergeRawTweets(base, extra) {
+	const baseText = typeof base.text === "string" ? base.text : "";
+	const extraText = typeof extra.text === "string" ? extra.text : "";
+	return {
+		...base,
+		...extra,
+		text: extraText.length > baseText.length ? extraText : baseText,
+		user: mergeUserFields(base.user, extra.user),
+		media: unionMedia(base.media, extra.media),
+		metrics: mergeMetrics(base.metrics, extra.metrics),
+		promoted: base.promoted === true || extra.promoted === true,
+		isArticle: base.isArticle === true || extra.isArticle === true,
+		article: base.article ?? extra.article,
+	};
+}
+
+/**
  * Text-only expanders: truncated tweet bodies use a non-button "Show
  * more" (div/span inside the article). Three hard rules so a click can
  * NEVER navigate the tab away (clicking a link mid-scrape aborts the
@@ -291,22 +535,43 @@ function conversationIdFromUrl(pageUrl) {
 }
 
 /**
- * Scrape every loaded tweet in DOM order, deduped by id.
+ * Scrape every loaded tweet in DOM order, deduped by id. The X Article
+ * reader (when present) is folded in first so the article root leads
+ * the thread instead of being skipped for lack of a `/status/` link.
  *
  * @param {ParentNode} [doc]
  * @param {string} [pageUrl]
  * @returns {{ tweets: RawTweet[], url: string }}
  */
 function scrapeRaw(doc, pageUrl = "") {
-	const tweets = [];
-	const seen = new Set();
-	for (const article of findTweetElements(doc)) {
-		const tweet = parseTweet(article);
-		if (!tweet || seen.has(tweet.id)) {
-			continue;
+	const byId = new Map();
+	/** @type {string[]} */
+	const order = [];
+	/**
+	 * @param {RawTweet | null} tweet
+	 */
+	const put = (tweet) => {
+		if (!tweet || typeof tweet.id !== "string" || tweet.id === "") {
+			return;
 		}
-		seen.add(tweet.id);
-		tweets.push(tweet);
+		const existing = byId.get(tweet.id);
+		if (existing) {
+			byId.set(tweet.id, mergeRawTweets(existing, tweet));
+			return;
+		}
+		byId.set(tweet.id, tweet);
+		order.push(tweet.id);
+	};
+	put(parseArticleDom(doc ?? document, pageUrl));
+	for (const article of findTweetElements(doc)) {
+		put(parseTweet(article));
+	}
+	const tweets = [];
+	for (const id of order) {
+		const tweet = byId.get(id);
+		if (tweet) {
+			tweets.push(tweet);
+		}
 	}
 	return { tweets, url: pageUrl };
 }
@@ -316,6 +581,7 @@ globalThis.XAdapter = {
 	findExpandButtons,
 	findTextExpanders,
 	findTweetElements,
+	parseArticleDom,
 	parseCount,
 	parseTweet,
 	scrapeRaw,

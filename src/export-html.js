@@ -171,8 +171,10 @@ export function renderThreadHtml(snapshot) {
 				!tweet.replyTo && tweet.inferred
 					? `<p class="note">Order from the page; reply target unknown.</p>`
 					: "";
+			const article = tweet.isArticle ? `<p class="note">X Article</p>` : "";
 			return `<article>
 <header><strong>${escapeHtml(authorLabel(tweet))}</strong> · <time>${escapeHtml((tweet.createdAt ?? "").slice(0, 10))}</time> · <a href="${escapeHtml(tweet.url)}">original</a></header>
+${article}
 <p class="text">${escapeHtml(tweet.text)}</p>
 ${replied ? `<p class="note">${escapeHtml(replied)}</p>` : ""}
 ${inferred}
@@ -272,11 +274,12 @@ export function renderThreadMarkdown(snapshot) {
 				? "\n\n_Order from the page; reply target unknown._"
 				: "";
 		const media = mediaMarkdown(tweet.media);
+		const article = tweet.isArticle ? "_X Article_\n\n" : "";
 		return `## ${authorLabel(tweet)} — ${(tweet.createdAt ?? "").slice(0, 10)}
 
 ${tweet.url}
 
-${tweet.text}${replied ? `\n\n${replied}` : ""}${inferred}${media ? `\n\n${media}` : ""}
+${article}${tweet.text}${replied ? `\n\n${replied}` : ""}${inferred}${media ? `\n\n${media}` : ""}
 
 *${metricsText(tweet.metrics)}*`;
 	});

@@ -662,6 +662,45 @@ EMPTY_TRANSCRIPT eksplisit) + upload MD ke ChatGPT 1 probe menit.
 - [ ] Jalur X + O'Reilly tidak regresi
 - [ ] Review human; branch tetap pisah sampai diputuskan merge
 
+## Phase 7: X Article (long-form) sebagai root thread
+
+## Task 18: Tangkap X Article (network + DOM) jadi root tweet
+
+**Description:** Root thread bisa berupa X Article, bukan tweet biasa — body-nya
+tidak ada di `[data-testid="tweetText"]` dan tidak dibaca parser `tweet_results`.
+Dua jalur diisi: (a) `x-graphql.js` membaca `result.article.article_results.result`
+(title + DraftJS `content_state` + `media_entities`) dan render ke Markdown;
+(b) `x-adapter.js` mendeteksi reader DOM (`[data-testid="twitterArticleReadView"]`,
+`twitter-article-title`, `twitterArticleRichTextView`, blok `longform-*`) sebagai
+fallback. Kontrak `Tweet` dapat `isArticle` + `article {title,text,coverUrl}`;
+`tweet.text` diisi `# title` + body supaya semua exporter ikut menampilkan tanpa
+menambah kolom tabular.
+
+**Acceptance criteria:**
+- [x] Payload API `article_results.result` jadi root tweet: title, cover, media,
+  dan body (heading/list/quote/link/atomic-media)
+- [x] Reader DOM jadi root tweet saat network dump tidak ada
+- [x] Dua sighting (reader + tweet cell) merge: teks terpanjang, user/media/metrics diisi
+- [x] `tweet.isArticle`/`article` mengalir ke JSON; MD/HTML menandai "X Article"
+- [x] Header tabular 43 kolom tidak berubah; body masuk kolom Full Text
+
+**Verification:**
+- [x] `tests/graphql.test.js`, `tests/model.test.js`, `tests/export.test.js` hijau
+- [x] `tests/e2e.test.js` (reader DOM nyata di Chromium) hijau
+- [x] `npm run quality` + `npm test` hijau
+
+**Files touched:** `src/model.js`, `src/x-graphql.js`, `src/x-adapter.js`,
+`src/export-html.js`, `tests/*`, `tests/fixtures/x-article-detail.json`,
+`tests/fixtures/thread-article.html`, `docs/export-columns.md`, `README.md`
+
+**Estimated scope:** Medium (2 jalur + kontrak + fixture)
+
+### Checkpoint: X Article
+
+- [ ] Manual E2E di thread artikel asli: root + body + media ikut ter-download
+- [ ] Warning "Root tweet not captured" hilang di popup
+- [ ] Review human sebelum lanjut
+
 ## Risks and Mitigations (tambahan Phase 6)
 
 | Risk | Impact | Mitigation |

@@ -19,7 +19,7 @@ const fixture = JSON.parse(
  * user/media/metrics). Cast from unknown because the browser boundary
  * is untyped; the asserts below verify it for real.
  *
- * @typedef {{ tweets: { id: string, text: string, user: { screenName: string, name: string }, createdAt: string, metrics: { likes: number, views: number }, media: { url: string, type: string }[] }[] }} ScrapeResult
+ * @typedef {{ tweets: { id: string, text: string, user: { screenName: string, name: string }, createdAt: string, metrics: { likes: number, views: number }, media: { url: string, type: string }[], isArticle?: boolean, article?: { title: string, text: string, coverUrl?: string } }[] }} ScrapeResult
  */
 
 /**
@@ -75,6 +75,50 @@ describe("x-adapter (real Chromium)", () => {
 			},
 		]);
 		assert.deepEqual(result.tweets[1].media, []);
+	});
+
+	it("captures an X Article reader as the thread root", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-article.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = /** @type {ScrapeResult} */ (
+			/** @type {unknown} */ (
+				await page.evaluate(() =>
+					globalThis.XAdapter.scrapeRaw(
+						document,
+						"https://x.com/satyanadella/status/2108213283144810958",
+					),
+				)
+			)
+		);
+
+		assert.equal(result.tweets.length, 2, "article root + one reply");
+		const [article, reply] = result.tweets;
+		assert.equal(article.id, "2108213283144810958");
+		assert.equal(article.isArticle, true);
+		assert.ok(article.article, "article metadata present");
+		assert.equal(article.article.title, "The Infinite SaaS Factory");
+		assert.ok(article.text.startsWith("# The Infinite SaaS Factory\n\n"));
+		assert.ok(article.text.includes("## Why it matters"));
+		assert.ok(
+			article.text.includes("> Software eats the world; agents eat software."),
+		);
+		assert.deepEqual(article.media, [
+			{ url: "https://pbs.twimg.com/media/ARTICLE_BODY.jpg", type: "photo" },
+		]);
+		assert.equal(article.user.screenName, "satyanadella");
+		assert.equal(
+			article.metrics.likes,
+			8400,
+			"tweet cell metrics merged into the reader root",
+		);
+		assert.equal(reply.id, "2108317616569831556");
+		assert.equal(reply.isArticle, undefined);
 	});
 
 	it("reports injected capabilities on PING so stale tabs are visible", async (t) => {

@@ -49,3 +49,14 @@ Aturan: field tanpa sumber DOM diisi kosong. Angka tidak pernah dikarang.
 | User Professional Type | `user.professionalType` (API) | **kosong** bila DOM-only |
 | User Created At | `user.createdAt` (API) | **kosong** bila DOM-only |
 | Scraped At | waktu scrape (ISO) | — |
+
+## X Article (long-form)
+
+Tweet root berupa X Article punya field tambahan `isArticle: true` dan
+`article: { title, text, coverUrl? }` (JSON). Semua exporter tetap
+membaca `tweet.text`, dan untuk article root `tweet.text` diisi
+`# <title>` + body hasil render (heading, list, blockquote, link, media).
+Jadi kolom **Full Text** di CSV/XLSX ikut memuat body artikel — bukan
+kolom baru (header 1:1 tidak berubah). Body dirender dari DraftJS
+`content_state` (jalur API) atau blok `longform-*` (jalur DOM); gambar
+artikel masuk `Media URLs`/`Media Types` sebagai `photo`.

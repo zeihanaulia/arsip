@@ -47,6 +47,8 @@ import { createTweet } from "./model.js";
  * @property {boolean} retweeted
  * @property {boolean} bookmarked
  * @property {boolean} isQuoteStatus
+ * @property {boolean} isArticle
+ * @property {{ title: string, text: string, coverUrl?: string }} [article]
  */
 /**
  * Narrows unknown JSON to a record. Single choke point so nested
@@ -258,6 +260,279 @@ function noteTextOf(result) {
 }
 
 /**
+ * The body of a long-form X Article lives one level below the tweet, at
+ * `article.article_results.result` (title + DraftJS content_state +
+ * media_entities). Null when the tweet is not an article.
+ *
+ * @param {Record<string, unknown>} result
+ * @returns {Record<string, unknown> | null}
+ */
+function articleResultOf(result) {
+	const article = asRecord(result.article);
+	const articleResult = asRecord(asRecord(article.article_results).result);
+	return Object.keys(articleResult).length > 0 ? articleResult : null;
+}
+
+/**
+ * DraftJS entityMap arrives as an array ([{key,value}]) or an object
+ * keyed by string. Look up one entity value in either shape.
+ *
+ * @param {unknown} entityMap
+ * @param {unknown} key
+ * @returns {Record<string, unknown>}
+ */
+function articleEntity(entityMap, key) {
+	const map = /** @type {Record<string, unknown>} */ (entityMap ?? {});
+	if (Array.isArray(map)) {
+		for (const raw of map) {
+			const entry = asRecord(raw);
+			if (String(entry.key) === String(key)) {
+				return asRecord(entry.value);
+			}
+		}
+		return {};
+	}
+	return asRecord(map[String(key)]);
+}
+
+/**
+ * @param {Record<string, unknown>} article
+ * @param {string} field "media_id" | "media_key"
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function findArticleMedia(article, field, value) {
+	const entities = Array.isArray(article.media_entities)
+		? article.media_entities
+		: [];
+	for (const raw of entities) {
+		const entity = asRecord(raw);
+		if (String(entity[field]) === String(value)) {
+			return entity;
+		}
+	}
+	return {};
+}
+
+/**
+ * Wraps one block's text per its DraftJS type. Unknown types stay plain
+ * so no formatting is invented.
+ *
+ * @param {string} type
+ * @param {string} text
+ * @returns {string}
+ */
+function articleBlockLine(type, text) {
+	if (text === "") {
+		return "";
+	}
+	const prefixed = /** @type {Record<string, string>} */ ({
+		"header-one": "# ",
+		"header-two": "## ",
+		"header-three": "### ",
+		"header-four": "#### ",
+		"unordered-list-item": "- ",
+		"ordered-list-item": "1. ",
+	})[type];
+	if (prefixed) {
+		return `${prefixed}${text}`;
+	}
+	if (type === "blockquote") {
+		return text
+			.split("\n")
+			.map((line) => `> ${line}`)
+			.join("\n");
+	}
+	if (type === "code-block") {
+		return `\`\`\`\n${text}\n\`\`\``;
+	}
+	return text;
+}
+
+/**
+ * Applies DraftJS entity ranges (links) to a block's text. Ranges are
+ * sorted ascending and rebuilt from the original characters so offsets
+ * never drift; unknown entities keep their raw text.
+ *
+ * @param {string} text
+ * @param {unknown} entityRanges
+ * @param {unknown} entityMap
+ * @returns {string}
+ */
+function articleLinkedText(text, entityRanges, entityMap) {
+	const ranges = (Array.isArray(entityRanges) ? entityRanges : [])
+		.map((raw) => asRecord(raw))
+		.sort((a, b) => countOf(a.offset) - countOf(b.offset));
+	const chars = Array.from(text);
+	let out = "";
+	let cursor = 0;
+	for (const range of ranges) {
+		const start = countOf(range.offset);
+		const end = start + countOf(range.length);
+		if (start < cursor || start > chars.length) {
+			continue;
+		}
+		const entity = articleEntity(entityMap, range.key);
+		const data = asRecord(entity.data);
+		out += chars.slice(cursor, start).join("");
+		const segment = chars.slice(start, end).join("");
+		out +=
+			entity.type === "LINK" && typeof data.url === "string"
+				? `[${segment}](${data.url})`
+				: segment;
+		cursor = end;
+	}
+	return out + chars.slice(cursor).join("");
+}
+
+/**
+ * Atomic blocks carry media references; render each as an image so the
+ * position inside the article survives. Non-media atomics fall back to
+ * their plain text.
+ *
+ * @param {Record<string, unknown>} block
+ * @param {unknown} entityMap
+ * @param {Record<string, unknown>} article
+ * @returns {string}
+ */
+function articleAtomicLine(block, entityMap, article) {
+	const ranges = Array.isArray(block.entityRanges) ? block.entityRanges : [];
+	const lines = [];
+	for (const raw of ranges) {
+		const entity = articleEntity(entityMap, asRecord(raw).key);
+		if (entity.type !== "MEDIA") {
+			continue;
+		}
+		const data = asRecord(entity.data);
+		const items = Array.isArray(data.mediaItems) ? data.mediaItems : [];
+		for (const rawItem of items) {
+			const info = asRecord(
+				findArticleMedia(article, "media_id", asRecord(rawItem).mediaId)
+					.media_info,
+			);
+			if (typeof info.original_img_url === "string") {
+				lines.push(`![image](${info.original_img_url})`);
+			}
+		}
+	}
+	return lines.join("\n\n");
+}
+
+/**
+ * @param {unknown} rawBlock
+ * @param {unknown} entityMap
+ * @param {Record<string, unknown>} article
+ * @returns {string}
+ */
+function articleBlockMarkdown(rawBlock, entityMap, article) {
+	const block = asRecord(rawBlock);
+	const text = textOf(block.text);
+	if (block.type === "atomic") {
+		const atomic = articleAtomicLine(block, entityMap, article);
+		return atomic !== "" ? atomic : articleBlockLine("unstyled", text.trim());
+	}
+	return articleBlockLine(
+		textOf(block.type),
+		articleLinkedText(text, block.entityRanges, entityMap),
+	);
+}
+
+/**
+ * Renders DraftJS content_state to plain Markdown: headings, lists,
+ * quotes, links, and inline media. Empty blocks are skipped, never
+ * invented.
+ *
+ * @param {Record<string, unknown>} article
+ * @returns {string}
+ */
+function renderArticleMarkdown(article) {
+	const state = asRecord(article.content_state);
+	const blocks = Array.isArray(state.blocks) ? state.blocks : [];
+	return blocks
+		.map((block) => articleBlockMarkdown(block, state.entityMap, article))
+		.filter((line) => line !== "")
+		.join("\n\n");
+}
+
+/**
+ * Article images/gifs as media items. Article payloads only expose
+ * `original_img_url`, so everything is captured as a photo (a video
+ * article's poster included) — never guessed into a video URL.
+ *
+ * @param {Record<string, unknown>} article
+ * @returns {ApiMedia[]}
+ */
+function articleMedia(article) {
+	const entities = Array.isArray(article.media_entities)
+		? article.media_entities
+		: [];
+	const /** @type {ApiMedia[]} */ media = [];
+	for (const raw of entities) {
+		const info = asRecord(asRecord(raw).media_info);
+		if (typeof info.original_img_url === "string") {
+			media.push({ url: info.original_img_url, type: "photo" });
+		}
+	}
+	return media;
+}
+
+/**
+ * @param {Record<string, unknown>} article
+ * @returns {string}
+ */
+function articleCoverUrl(article) {
+	const cover = asRecord(article.cover_media);
+	if (typeof cover.media_key !== "string" || cover.media_key === "") {
+		return "";
+	}
+	const media = findArticleMedia(article, "media_key", cover.media_key);
+	return textOf(asRecord(media.media_info).original_img_url);
+}
+
+/**
+ * Some payloads repeat the title as the first `header-one` block. Drop
+ * it so the rendered body never shows the title twice.
+ *
+ * @param {string} text
+ * @param {string} title
+ * @returns {string}
+ */
+function stripLeadingTitle(text, title) {
+	if (title === "") {
+		return text;
+	}
+	const lines = text.split("\n\n");
+	const first = (lines[0] ?? "").replace(/^#+\s*/, "");
+	return first === title ? lines.slice(1).join("\n\n") : text;
+}
+
+/**
+ * @param {Record<string, unknown>} article
+ * @returns {{ title: string, text: string, coverUrl?: string }}
+ */
+function parseArticle(article) {
+	const title = textOf(article.title);
+	const text = stripLeadingTitle(renderArticleMarkdown(article), title);
+	const coverUrl = articleCoverUrl(article);
+	return coverUrl ? { title, text, coverUrl } : { title, text };
+}
+
+/**
+ * The tweet-level text for an article root: title as an H1, then body.
+ *
+ * @param {{ title: string, text: string }} article
+ * @returns {string}
+ */
+function articleFullText(article) {
+	if (article.title === "") {
+		return article.text;
+	}
+	return article.text === ""
+		? `# ${article.title}`
+		: `# ${article.title}\n\n${article.text}`;
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {ApiTweet | null}
  */
@@ -271,13 +546,24 @@ function parseTweetResult(result) {
 	const createdAt = Date.parse(textOf(legacy.created_at));
 	const views = /** @type {Record<string, unknown>} */ (result.views ?? {});
 	const note = noteTextOf(result);
+	const articleRaw = articleResultOf(result);
+	const article = articleRaw ? parseArticle(articleRaw) : null;
+	const articleText = article ? articleFullText(article) : "";
 	return {
 		id,
-		text: note !== "" ? note : textOf(legacy.full_text),
+		text:
+			articleText !== ""
+				? articleText
+				: note !== ""
+					? note
+					: textOf(legacy.full_text),
 		url: user.screenName ? `https://x.com/${user.screenName}/status/${id}` : "",
 		createdAt: Number.isNaN(createdAt) ? "" : new Date(createdAt).toISOString(),
 		user,
-		media: parseMedia(result),
+		media: [
+			...parseMedia(result),
+			...(articleRaw ? articleMedia(articleRaw) : []),
+		],
 		metrics: {
 			replies: countOf(legacy.reply_count),
 			reposts: countOf(legacy.retweet_count),
@@ -293,6 +579,8 @@ function parseTweetResult(result) {
 		retweeted: legacy.retweeted === true,
 		bookmarked: legacy.bookmarked === true,
 		isQuoteStatus: legacy.is_quote_status === true,
+		isArticle: article !== null,
+		...(article ? { article } : {}),
 	};
 }
 
@@ -422,6 +710,8 @@ function apiTweetToTweet(api) {
 		retweeted: api.retweeted,
 		bookmarked: api.bookmarked,
 		isQuoteStatus: api.isQuoteStatus,
+		isArticle: api.isArticle,
+		...(api.article ? { article: { ...api.article } } : {}),
 	});
 }
 
@@ -458,5 +748,11 @@ function applyApiTweet(tweet, api) {
 	}
 	if (api.media.length > 0) {
 		tweet.media = api.media.map((item) => ({ ...item }));
+	}
+	if (api.article) {
+		tweet.isArticle = true;
+		tweet.article = { ...api.article };
+	} else if (api.isArticle) {
+		tweet.isArticle = true;
 	}
 }
