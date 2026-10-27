@@ -116,6 +116,23 @@ function tweetResult(itemContent) {
 }
 
 /**
+ * `TweetResultByRestId` returns the focal tweet directly under
+ * `data.tweetResult.result` instead of a timeline entry. Article roots
+ * are often fetched this way before the conversation timeline loads.
+ *
+ * @param {unknown} payload
+ * @returns {Record<string, unknown> | null}
+ */
+function directTweetResult(payload) {
+	const result = asRecord(asRecord(asRecord(payload).data).tweetResult).result;
+	if (!result || typeof result !== "object") {
+		return null;
+	}
+	const record = /** @type {Record<string, unknown>} */ (result);
+	return record.__typename === "Tweet" ? record : null;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -592,20 +609,23 @@ function parseTweetResult(result) {
  * @returns {ApiTweet[]}
  */
 export function extractRawTweets(payload) {
-	const tweets = [];
+	const /** @type {ApiTweet[]} */ tweets = [];
 	const seen = new Set();
+	const addResult = (/** @type {Record<string, unknown> | null} */ result) => {
+		if (!result) {
+			return;
+		}
+		const tweet = parseTweetResult(result);
+		if (!tweet || seen.has(tweet.id)) {
+			return;
+		}
+		seen.add(tweet.id);
+		tweets.push(tweet);
+	};
+	addResult(directTweetResult(payload));
 	for (const entry of timelineEntries(payload)) {
 		for (const itemContent of itemContents(entry)) {
-			const result = tweetResult(itemContent);
-			if (!result) {
-				continue;
-			}
-			const tweet = parseTweetResult(result);
-			if (!tweet || seen.has(tweet.id)) {
-				continue;
-			}
-			seen.add(tweet.id);
-			tweets.push(tweet);
+			addResult(tweetResult(itemContent));
 		}
 	}
 	return tweets;
@@ -655,6 +675,38 @@ function mergeUser(domUser, apiUser) {
 }
 
 /**
+ * Status id of the page the user opened. The same id is the conversation
+ * root, so it must lead the snapshot regardless of DOM/API arrival order.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot
+ * @returns {string}
+ */
+function sourceStatusId(snapshot) {
+	return /\/status\/(\d+)/.exec(snapshot?.sourceUrl ?? "")?.[1] ?? "";
+}
+
+/**
+ * Moves the root tweet to index 0 without cloning it. A root appended
+ * from the API would otherwise land after every reply.
+ *
+ * @param {import("./model.js").Tweet[]} tweets Mutated in place.
+ * @param {string} rootId
+ */
+function promoteRoot(tweets, rootId) {
+	if (rootId === "") {
+		return;
+	}
+	const index = tweets.findIndex((tweet) => tweet.id === rootId);
+	if (index < 0) {
+		return;
+	}
+	if (index > 0) {
+		tweets.unshift(...tweets.splice(index, 1));
+	}
+	tweets[0].inferred = false;
+}
+
+/**
  * Merges API truth into a DOM-built snapshot, matched by tweet id.
  * API wins for metrics, user basics, media, and reply refs; DOM-only
  * tweets and DOM-only fields are preserved, never clobbered.
@@ -683,6 +735,7 @@ export function mergeApiIntoSnapshot(snapshot, apiTweets) {
 			snapshot.tweets.push(apiTweetToTweet(api));
 		}
 	}
+	promoteRoot(snapshot?.tweets ?? [], sourceStatusId(snapshot));
 	return snapshot;
 }
 

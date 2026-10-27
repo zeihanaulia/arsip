@@ -44,9 +44,11 @@ Video yang tidak bisa diambil bytes-nya (stream/blob player) dicatat jujur di ma
 - Caption video hanya kalau DOM menyediakannya (`<track>`); umumnya tidak ada di X.
 - Thread raksasa dibatasi (40 batch / 300 tweet / ~21MB per file media).
 - X Article (long-form) didukung: body root di-render dari payload GraphQL
-  `article.article_results.result` dan/atau reader DOM. Kalau network dump tidak
-  tertangkap dan reader belum ter-mount, root artikel tidak masuk — cek warning
-  "Root tweet not captured" di popup.
+  `article.article_results.result` di `TweetDetail` atau `TweetResultByRestId`,
+  dan/atau reader DOM. Root artikel selalu dipindah ke urutan pertama. Kalau
+  kedua payload tidak tertangkap dan reader belum ter-mount, root hanya berisi
+  teks pendek — reload tab lalu download ulang. Warning "Root tweet not captured"
+  hanya muncul kalau root sama sekali tidak ada.
 
 ## Develop
 

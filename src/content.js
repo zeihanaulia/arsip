@@ -394,24 +394,48 @@ function accumulateBatch(collected) {
  * newest first, capped so the message channel survives. The background
  * parses them; unparseable bodies are skipped there, never here.
  *
+ * `TweetResultByRestId` is the focal-tweet response that carries an
+ * X Article body. It arrives once, early, so the newest-first cap would
+ * evict it after enough auto-scroll batches. Keep those separately and
+ * always retain the oldest body (the first page load, root included).
+ *
  * @returns {string[]}
  */
 function timelineApiBodies() {
-	const bodies = [];
+	const newest = [];
+	const direct = [];
+	let oldestTimeline = "";
 	for (let index = netLog.length - 1; index >= 0; index -= 1) {
 		const entry = netLog[index];
 		if (
-			typeof entry.url === "string" &&
-			/TweetDetail|TweetResultByRestId|HomeTimeline|SearchTimeline/.test(
+			typeof entry.url !== "string" ||
+			!/TweetDetail|TweetResultByRestId|HomeTimeline|SearchTimeline/.test(
 				entry.url,
-			) &&
-			typeof entry.body === "string" &&
-			entry.body !== ""
+			) ||
+			typeof entry.body !== "string" ||
+			entry.body === ""
 		) {
-			bodies.push(entry.body);
+			continue;
 		}
-		if (bodies.length >= 15) {
-			break;
+		if (entry.url.includes("TweetResultByRestId")) {
+			if (direct.length < 5) {
+				direct.push(entry.body);
+			}
+			continue;
+		}
+		// Scanned newest-first, so the last non-direct match is the oldest
+		// timeline capture: the page load that carries the conversation root.
+		oldestTimeline = entry.body;
+		if (newest.length < 15) {
+			newest.push(entry.body);
+		}
+	}
+	const bodies = [];
+	const seen = new Set();
+	for (const body of [...newest, ...direct, oldestTimeline]) {
+		if (body !== "" && !seen.has(body)) {
+			seen.add(body);
+			bodies.push(body);
 		}
 	}
 	return bodies;

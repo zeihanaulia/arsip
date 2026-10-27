@@ -360,6 +360,89 @@ describe("x-adapter (real Chromium)", () => {
 		assert.deepEqual(second.payload?.api, ['{"second":true}']);
 	});
 
+	it("keeps the first article response when later captures overflow the cap", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+		await page.addScriptTag({ path: join(root, "src/content.js") });
+
+		async function capture(
+			/** @type {string} */ url,
+			/** @type {string} */ body,
+		) {
+			await page.evaluate(
+				({ url: entryUrl, body: entryBody }) => {
+					window.dispatchEvent(
+						new CustomEvent("arsip:net", {
+							detail: { url: entryUrl, status: 200, body: entryBody },
+						}),
+					);
+				},
+				{ url, body },
+			);
+		}
+
+		await capture(
+			"https://x.com/i/api/graphql/X/TweetResultByRestId?variables=%7B%7D",
+			'{"direct":true}',
+		);
+		await capture(
+			"https://x.com/i/api/graphql/X/TweetDetail?variables=%7B%7D",
+			'{"oldest":true}',
+		);
+		for (let index = 0; index < 16; index += 1) {
+			await capture(
+				`https://x.com/i/api/graphql/X/TweetDetail?page=${index}`,
+				JSON.stringify({ index }),
+			);
+		}
+
+		const result = await page.evaluate(() => {
+			const holder =
+				/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+					globalThis
+				);
+			const listener = holder.__listeners?.[0];
+			if (!listener) {
+				throw new Error("content script did not register a listener");
+			}
+			return new Promise((resolve) => {
+				listener({ type: "SCRAPE_START", payload: {} }, {}, resolve);
+			});
+		});
+		const payload = /** @type {{ payload?: { api?: string[] } }} */ (result)
+			.payload;
+
+		assert.ok(
+			payload?.api?.includes('{"direct":true}'),
+			"TweetResultByRestId body must survive the newest-first cap",
+		);
+		assert.ok(
+			payload?.api?.includes('{"oldest":true}'),
+			`first TweetDetail body must survive the newest-first cap: ${JSON.stringify(payload?.api)}`,
+		);
+	});
+
 	it("answers DONE with scrollerMissing when autoScroll has no scroller", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

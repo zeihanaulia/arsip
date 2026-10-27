@@ -452,7 +452,7 @@ function mergeCapturedApi(snapshot, raw) {
 	}
 	const before = new Set((snapshot?.tweets ?? []).map((tweet) => tweet.id));
 	const apiTweets = [];
-	for (const body of raw.slice(0, 15)) {
+	for (const body of raw.slice(0, 30)) {
 		if (typeof body !== "string" || body === "") {
 			continue;
 		}

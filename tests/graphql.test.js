@@ -14,6 +14,9 @@ const payload = JSON.parse(
 const articlePayload = JSON.parse(
 	readFileSync(join(root, "tests/fixtures/x-article-detail.json"), "utf8"),
 );
+const articleRestIdPayload = JSON.parse(
+	readFileSync(join(root, "tests/fixtures/x-article-rest-id.json"), "utf8"),
+);
 
 describe("extractRawTweets", () => {
 	it("reads root plus thread items from a real TweetDetail payload", () => {
@@ -197,6 +200,26 @@ describe("mergeApiIntoSnapshot", () => {
 });
 
 describe("extractRawTweets — X Article", () => {
+	it("reads the article root from a TweetResultByRestId response", () => {
+		const tweets = extractRawTweets(articleRestIdPayload);
+
+		assert.equal(tweets.length, 1);
+		const article = tweets[0];
+		assert.equal(article.id, "2114542280535318557");
+		assert.equal(article.isArticle, true);
+		assert.ok(article.article, "article metadata present");
+		assert.equal(
+			article.article.title,
+			"The new set of problems for engineers to solve",
+		);
+		assert.ok(article.article.text.includes("identity crisis"));
+		assert.ok(
+			article.text.startsWith(
+				"# The new set of problems for engineers to solve\n\n",
+			),
+		);
+	});
+
 	function articleRoot() {
 		const article = extractRawTweets(articlePayload).find(
 			(tweet) => tweet.isArticle,
@@ -273,7 +296,7 @@ describe("extractRawTweets — X Article", () => {
 });
 
 describe("mergeApiIntoSnapshot — X Article", () => {
-	it("appends the article root the DOM never captured", () => {
+	it("puts the article root the DOM never captured at the front", () => {
 		const snapshot = assembleSnapshot(
 			[
 				{
@@ -290,13 +313,39 @@ describe("mergeApiIntoSnapshot — X Article", () => {
 			extractRawTweets(articlePayload),
 		);
 
-		const rootTweet = merged.tweets.find(
-			(tweet) => tweet.id === "2108213283144810958",
-		);
-		assert.ok(rootTweet, "article root appended");
+		const rootTweet = merged.tweets[0];
+		assert.equal(rootTweet.id, "2108213283144810958");
 		assert.equal(rootTweet.isArticle, true);
 		assert.ok(rootTweet.article, "article metadata present");
 		assert.ok(rootTweet.article.text.includes("## Why it matters"));
 		assert.ok(rootTweet.text.startsWith("# The Infinite SaaS Factory"));
+		assert.equal(rootTweet.inferred, false, "root is explicit, not inferred");
+	});
+
+	it("moves a root captured at the bottom back to the front", () => {
+		const snapshot = assembleSnapshot(
+			[
+				{
+					id: "2108317616569831556",
+					text: "reply only",
+					url: "https://x.com/Aaronontheweb/status/2108317616569831556",
+				},
+				{
+					id: "2108213283144810958",
+					text: "short preview only",
+					url: "https://x.com/satyanadella/status/2108213283144810958",
+				},
+			],
+			"https://x.com/satyanadella/status/2108213283144810958",
+		);
+
+		const merged = mergeApiIntoSnapshot(
+			snapshot,
+			extractRawTweets(articlePayload),
+		);
+
+		assert.equal(merged.tweets[0].id, "2108213283144810958");
+		assert.ok(merged.tweets[0].text.includes("## Why it matters"));
+		assert.equal(merged.tweets[1].id, "2108317616569831556");
 	});
 });
