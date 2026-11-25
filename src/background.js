@@ -317,6 +317,9 @@ async function scrapeAndDownload(options) {
 		{ skipPromoted },
 	);
 	snapshot.tweets = assignThreadRelations(snapshot.tweets, sourceUrl);
+	// An article reader may have no tweet cells; captured API data is an
+	// independent source, not just enrichment for an already nonempty DOM.
+	const apiAdded = mergeCapturedApi(snapshot, payload.api);
 	if (snapshot.tweets.length === 0) {
 		return createMessage(MESSAGE_TYPES.SCRAPE_ERROR, {
 			code: "EMPTY_THREAD",
@@ -324,7 +327,6 @@ async function scrapeAndDownload(options) {
 				"No tweets detected — open a thread (not home or an empty page) and try again.",
 		});
 	}
-	const apiAdded = mergeCapturedApi(snapshot, payload.api);
 	const rawMedia = Array.isArray(payload.media) ? payload.media : [];
 	enrichSnapshotMedia(snapshot, rawMedia);
 	const rootCaptured = isRootCaptured(snapshot);
