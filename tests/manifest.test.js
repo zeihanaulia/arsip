@@ -87,6 +87,23 @@ describe("manifest", () => {
 		assert.equal(hook?.run_at, "document_start");
 	});
 
+	it("starts every network receiver before page scripts can emit responses", () => {
+		const entries = /** @type {{ js?: string[], run_at?: string }[]} */ (
+			manifest.content_scripts ?? []
+		);
+		const receivers = entries.filter((entry) =>
+			entry.js?.includes("src/content.js"),
+		);
+		assert.ok(receivers.length > 0);
+		for (const receiver of receivers) {
+			assert.equal(
+				receiver.run_at,
+				"document_start",
+				"content.js must not miss responses emitted before document_idle",
+			);
+		}
+	});
+
 	it("gives every BUILD_ZIP-capable page the zip helpers (media.js)", () => {
 		const entries = /** @type {{ js?: string[], world?: string }[]} */ (
 			manifest.content_scripts ?? []
