@@ -1,6 +1,6 @@
 # Implementation Plan: X Thread Downloader (Chrome Extension MV3)
 
-> Terakhir diperbarui: 2026-11-25
+> Terakhir diperbarui: 2026-11-27
 > Revisions Log: lihat bagian "Revisions Log" di akhir dokumen.
 
 ## Overview
@@ -698,6 +698,57 @@ menambah kolom tabular.
 `tests/fixtures/thread-article.html`, `docs/export-columns.md`, `README.md`
 
 **Estimated scope:** Medium (2 jalur + kontrak + fixture)
+
+## Task 18b: Adaptasi app x-web baru (SSR inline + DOM tanpa data-testid)
+
+**Description:** X memigrasikan halaman status/article ke app `x-web` (SSR,
+`data-app-version=7a9b766…`). Tweet tetap `<article>` tetapi tanpa
+`data-testid`; payload awal `TweetDetail`/`TweetResultByRestId` tidak lewat
+fetch/XHR, melainkan ditanam sebagai string JSON di `<script>` inline dan
+dihapus setelah hydration. Adapter/parser lama jadi no-match (0 tweet →
+`EMPTY_THREAD`). Perbaikan: (a) `x-adapter.js` fallback DOM baru (article
+dengan status link, `div[dir="auto"].whitespace-pre-wrap`, avatar
+`alt="@handle"`, aria-label metrics, timestamp link absolut); (b)
+`ssrPayloads()` membaca string literal JSON dari inline script, dan
+`content.js` menyimpannya via MutationObserver sejak `document_start`
+sebelum hydration menghapus node; (c) `x-graphql.js` menerima
+`tweet_result_by_rest_id`, `details.*`, `counts.*`, `reply_to_results`,
+`media_entities2`, `timeline item.content` baru, article `metadata`
+(createdAt fallback) dan DraftJS snake_case; (d) article reader DOM baru
+`[data-article-part="title|byline|body|cover"]`.
+
+**Acceptance criteria:**
+- [x] Live status page (2026-11-27): 4 tweet ter-scrape dari DOM baru tanpa
+  `data-testid` (text, user, metrics, media, timestamp absolut root)
+- [x] Payload SSR (`tweet_result_by_rest_id` + timeline) tertangkap dan
+  diparse; merge mengisi `createdAt` presisi + counts + reply refs untuk
+  tweet awal, termasuk saat script sudah dihapus dari DOM
+- [x] Live article page (`/username/article/<id>`): title + body + cover
+  ter-scrape dari `[data-article-part]`; payload article (snake_case) merge,
+  `createdAt` fallback dari `article.metadata.first_published_at_secs`
+- [x] `reply_to_results`/`media_entities2`/`note_tweet` baru terbaca; payload
+  lama tetap hijau (tanpa regresi)
+- [x] `npm run verify` hijau (180 tests + quality)
+- [x] Tidak ada `eval`/remote-code/permission baru; egress tetap X/CDN
+
+**Verification:**
+- [x] `tests/graphql.test.js` + `tests/e2e.test.js` (fixture DOM/SSR baru) hijau
+- [x] Live check Playwright (Chrome asli): DOM 4 tweet, SSR 2 bodies, merge 4
+- [x] Live check article: root + body + media + createdAt
+- [ ] Manual extension reload + 1 download ZIP dari tab X (user) — tetap
+  bagian checkpoint Phase 7
+
+**Files touched:** `src/x-adapter.js`, `src/x-graphql.js`, `src/content.js`,
+`src/scroller.js`, `src/snapshot.js`, `tests/graphql.test.js`,
+`tests/e2e.test.js`, `tests/fixtures/{thread-new.html,thread-article-new.html,
+x-tweet-detail-new.json,x-article-new.json}`, `docs/export-columns.md`,
+`README.md`
+
+**Estimated scope:** Medium-Large (bugfix arsitektural 2 jalur)
+
+**Known limitation:** timestamp balasan yang hanya tampil relatif ("17h")
+tidak diubah jadi ISO (tidak menebak); SSR/API mengisi presisi untuk tweet
+yang ter-capture, DOM-only tetap kosong.
 
 ### Checkpoint: X Article
 
@@ -2617,6 +2668,7 @@ Detail:
 
 | Tanggal | Perubahan | Alasan |
 |---------|-----------|--------|
+| 2026-11-27 | Task 18b: adaptasi app `x-web` baru — fallback DOM tanpa `data-testid`, capture SSR inline via MutationObserver `document_start`, parser `tweet_result_by_rest_id`/`details`/`counts`/`reply_to_results`/`media_entities2`, article DOM `[data-article-part]` + snake_case DraftJS + `createdAt` dari article metadata. 180 test + quality hijau; live check status + article di Chrome asli. | X mengganti halaman status/article ke app SSR baru; DOM lama 0 match dan payload awal tidak lagi lewat fetch/XHR sehingga extension berhenti menghasilkan tweet. |
 | 2026-11-25 | Bugfix fallback network: pindahkan merge API sebelum guard `EMPTY_THREAD`; regresi worker membuktikan DOM kosong + payload artikel valid harus diekspor, sedangkan DOM+API kosong tetap ditolak. 170/170 test dan quality snapshot kode hijau; log mentah user tidak diubah. | Worker sebelumnya menolak hasil DOM kosong sebelum membaca payload network; perbaikan timing listener saja tidak menutup jalur ini. |
 | 2026-11-25 | Bugfix capture awal: stack penerima X/YouTube dijalankan pada `document_start`, sama seperti hook MAIN; tambah guard manifest dan regresi browser untuk respons sebelum body tersedia. 168/168 test hijau; quality hijau pada snapshot kode tanpa log mentah user (file asli tidak diubah). Checkpoint manual X tetap terbuka. | Log user berisi request pendukung tanpa payload tweet; listener default `document_idle` berpotensi kehilangan respons awal. Ini memperbaiki race yang dapat direproduksi, bukan bukti semua kasus log kosong punya penyebab sama. |
 | 2026-11-03 | Tambah Phase 8 + Task 19-22 (Substack article + comments) | Permintaan arsip post Substack di custom domain; bukti `preloads-json` + comments API ada di `docs/ideas/substack.md` |

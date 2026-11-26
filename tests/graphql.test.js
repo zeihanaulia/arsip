@@ -17,6 +17,12 @@ const articlePayload = JSON.parse(
 const articleRestIdPayload = JSON.parse(
 	readFileSync(join(root, "tests/fixtures/x-article-rest-id.json"), "utf8"),
 );
+const newWebPayload = JSON.parse(
+	readFileSync(join(root, "tests/fixtures/x-tweet-detail-new.json"), "utf8"),
+);
+const newWebArticlePayload = JSON.parse(
+	readFileSync(join(root, "tests/fixtures/x-article-new.json"), "utf8"),
+);
 
 describe("extractRawTweets", () => {
 	it("reads root plus thread items from a real TweetDetail payload", () => {
@@ -111,6 +117,131 @@ describe("extractRawTweets", () => {
 			"full note text, not the 279-char legacy truncation",
 		);
 		assert.ok((noteRoot?.text ?? "").length > 1000);
+	});
+});
+
+describe("extractRawTweets — new x-web payloads", () => {
+	it("reads tweet_result_by_rest_id and the nested timeline content", () => {
+		const tweets = extractRawTweets(newWebPayload);
+
+		assert.equal(tweets.length, 4);
+		const root = tweets[0];
+		assert.equal(root.id, "2125797463047258119");
+		assert.ok(root.text.startsWith("Every child in America"));
+		assert.equal(root.createdAt, new Date(1795664585000).toISOString());
+		assert.equal(root.user.screenName, "elonmusk");
+		assert.equal(root.user.name, "Elon Musk");
+		assert.equal(root.user.blueVerified, true);
+		assert.equal(root.metrics.likes, 513685);
+		assert.equal(root.metrics.reposts, 48976);
+		assert.equal(root.metrics.views, 25339543);
+		assert.equal(root.replyTo, null);
+	});
+
+	it("reads reply refs from reply_to_results instead of legacy ids", () => {
+		const reply = extractRawTweets(newWebPayload).find(
+			(tweet) => tweet.id === "2125832205301878841",
+		);
+
+		assert.ok(reply, "reply extracted");
+		assert.equal(reply.replyTo, "2125797463047258119");
+		assert.equal(reply.createdAt, new Date(1795672868000).toISOString());
+	});
+
+	it("keeps the new note_tweet full text", () => {
+		const note = extractRawTweets(newWebPayload).find(
+			(tweet) => tweet.id === "2125867208358105441",
+		);
+
+		assert.ok(note, "note tweet extracted");
+		assert.ok(note.text.includes("I recommend holding on to your shares."));
+	});
+
+	it("reads the new article shape with snake_case DraftJS fields", () => {
+		const [article] = extractRawTweets(newWebArticlePayload);
+
+		assert.equal(article.id, "2108213283144810958");
+		assert.equal(article.isArticle, true);
+		assert.ok(article.article, "article metadata present");
+		assert.equal(article.article.title, "The Infinite SaaS Factory");
+		assert.equal(
+			article.article.coverUrl,
+			"https://pbs.twimg.com/media/ARTICLE_COVER.jpg",
+		);
+		assert.ok(article.article.text.includes("## Why it matters"));
+		assert.ok(article.article.text.includes("- Agents need a substrate"));
+		assert.ok(
+			article.article.text.includes(
+				"> Software eats the world; agents eat software.",
+			),
+		);
+		assert.ok(
+			article.article.text.includes("[here](https://example.com/infinite)"),
+			"snake_case entity_range link rendered",
+		);
+		assert.ok(
+			article.article.text.includes(
+				"![image](https://pbs.twimg.com/media/ARTICLE_BODY.jpg)",
+			),
+			"snake_case media_items atomic rendered",
+		);
+		assert.equal(article.createdAt, new Date(1762500000000).toISOString());
+		assert.equal(article.metrics.likes, 8400);
+		assert.equal(article.user.blueVerified, true);
+	});
+
+	it("falls back to article publication metadata for createdAt", () => {
+		const articleOnly = {
+			data: {
+				tweet_result_by_rest_id: {
+					result: {
+						__typename: "Tweet",
+						rest_id: "123",
+						core: {
+							user_results: {
+								result: {
+									rest_id: "1",
+									core: { name: "Author", screen_name: "author" },
+								},
+							},
+						},
+						article: {
+							article_results: {
+								result: {
+									title: "Article",
+									plain_text: "Body copy",
+									metadata: { first_published_at_secs: 1792981140 },
+								},
+							},
+						},
+					},
+				},
+			},
+		};
+
+		const [tweet] = extractRawTweets(articleOnly);
+
+		assert.equal(tweet.createdAt, new Date(1792981140000).toISOString());
+		assert.equal(tweet.article?.text, "Body copy");
+	});
+
+	it("fills the page conversation id when the payload omits it", () => {
+		const snapshot = assembleSnapshot(
+			[],
+			"https://x.com/elonmusk/status/2125797463047258119",
+		);
+
+		const merged = mergeApiIntoSnapshot(
+			snapshot,
+			extractRawTweets(newWebPayload),
+		);
+
+		assert.ok(merged.tweets.length > 0);
+		assert.ok(
+			merged.tweets.every(
+				(tweet) => tweet.conversationId === "2125797463047258119",
+			),
+		);
 	});
 });
 

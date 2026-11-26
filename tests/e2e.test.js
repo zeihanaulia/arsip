@@ -121,6 +121,188 @@ describe("x-adapter (real Chromium)", () => {
 		assert.equal(reply.isArticle, undefined);
 	});
 
+	it("scrapes the new x-web DOM without data-testid attributes", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-new.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = /** @type {ScrapeResult} */ (
+			/** @type {unknown} */ (
+				await page.evaluate(() =>
+					globalThis.XAdapter.scrapeRaw(document, location.href),
+				)
+			)
+		);
+
+		assert.deepEqual(
+			result.tweets.map((tweet) => tweet.id),
+			["2125797463047258119", "2125832205301878841"],
+		);
+		assert.equal(
+			result.tweets[0].text,
+			"Every child in America will receive two SpaceX shares, one from the company and one from me personally",
+		);
+		assert.equal(result.tweets[0].user.screenName, "elonmusk");
+		assert.equal(result.tweets[0].user.name, "Elon Musk");
+		assert.notEqual(result.tweets[0].createdAt, "", "timestamp link parsed");
+		assert.equal(result.tweets[0].metrics.likes, 514004);
+		assert.equal(result.tweets[0].metrics.views, 25364400);
+		assert.deepEqual(result.tweets[0].media, [
+			{
+				url: "https://pbs.twimg.com/media/NEWFIXTURE.jpg",
+				type: "photo",
+			},
+		]);
+		assert.equal(result.tweets[1].user.screenName, "replyuser");
+	});
+
+	it("extracts the SSR API payload from inline scripts", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-new.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const payloads = await page.evaluate(() =>
+			globalThis.XAdapter.ssrPayloads(document),
+		);
+
+		assert.equal(payloads.length, 1);
+		const parsed = JSON.parse(payloads[0]);
+		assert.ok(parsed.data.tweet_result_by_rest_id, "direct tweet payload");
+		assert.ok(
+			parsed.data.threaded_conversation_with_injections_v2,
+			"timeline payload",
+		);
+
+		// x-web removes the inline script after hydration; the content
+		// script keeps its text and passes it as extraSources.
+		const captured = await page.evaluate(
+			() =>
+				document.querySelector("script[data-tsr-stream-part]")?.textContent ??
+				"",
+		);
+		await page.evaluate(() => {
+			document.querySelector("script[data-tsr-stream-part]")?.remove();
+		});
+		const fromCache = await page.evaluate(
+			(text) => globalThis.XAdapter.ssrPayloads(document, [text]),
+			captured,
+		);
+		assert.equal(fromCache.length, 1);
+	});
+
+	it("captures inline SSR scripts before hydration removes them", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			const holder = /** @type {{ __listeners?: unknown[] }} */ (globalThis);
+			holder.__listeners = [];
+			Object.assign(globalThis, {
+				chrome: {
+					runtime: {
+						onMessage: {
+							addListener: (/** @type {unknown} */ fn) => {
+								holder.__listeners?.push(fn);
+							},
+						},
+						sendMessage: async () => ({}),
+					},
+				},
+			});
+		});
+		await page.addInitScript({ path: join(root, "src/x-adapter.js") });
+		await page.addInitScript({ path: join(root, "src/content.js") });
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-new.html")).href,
+		);
+
+		const response = await page.evaluate(
+			() =>
+				new Promise((resolve) => {
+					const holder =
+						/** @type {{ __listeners?: ((...args: unknown[]) => void)[] }} */ (
+							globalThis
+						);
+					const listener = holder.__listeners?.[0];
+					if (!listener) {
+						throw new Error("content script did not register a listener");
+					}
+					listener(
+						{
+							type: "SCRAPE_START",
+							payload: {
+								autoScroll: false,
+								videoMode: "bundle",
+								skipPromoted: true,
+							},
+						},
+						{},
+						resolve,
+					);
+				}),
+		);
+		const payload = /** @type {{ payload?: { api?: string[] } }} */ (response)
+			.payload;
+
+		assert.ok(
+			(payload?.api ?? []).some((body) =>
+				body.includes("tweet_result_by_rest_id"),
+			),
+			"inline SSR payload captured at document_start",
+		);
+	});
+
+	it("captures the new x-web article reader", async (t) => {
+		const browser = await chromium.launch({ headless: !headed });
+		t.after(() => browser.close());
+		const page = await browser.newPage();
+		await page.goto(
+			pathToFileURL(join(root, "tests/fixtures/thread-article-new.html")).href,
+		);
+		await page.addScriptTag({ path: join(root, "src/x-adapter.js") });
+
+		const result = /** @type {ScrapeResult} */ (
+			/** @type {unknown} */ (
+				await page.evaluate(() =>
+					globalThis.XAdapter.scrapeRaw(
+						document,
+						"https://x.com/satyanadella/article/2108213283144810958",
+					),
+				)
+			)
+		);
+
+		assert.equal(result.tweets.length, 1);
+		const article = result.tweets[0];
+		assert.equal(article.id, "2108213283144810958");
+		assert.equal(article.isArticle, true);
+		assert.ok(article.article, "article metadata present");
+		assert.equal(article.article.title, "The Infinite SaaS Factory");
+		assert.ok(article.article.text.includes("## Why it matters"));
+		assert.ok(article.article.text.includes("- Agents need a substrate"));
+		assert.ok(
+			article.article.text.includes(
+				"> Software eats the world; agents eat software.",
+			),
+		);
+		assert.equal(article.user.screenName, "satyanadella");
+		assert.equal(article.user.name, "Satya Nadella");
+		assert.ok(
+			article.media.some((item) =>
+				item.url.includes("https://pbs.twimg.com/media/ARTICLE_COVER.jpg"),
+			),
+			"cover inventoried",
+		);
+	});
+
 	it("reports injected capabilities on PING so stale tabs are visible", async (t) => {
 		const browser = await chromium.launch({ headless: !headed });
 		t.after(() => browser.close());

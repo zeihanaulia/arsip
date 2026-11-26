@@ -1,0 +1,180 @@
+{
+	"data": {
+		"tweet_result_by_rest_id": {
+			"rest_id": "2108213283144810958",
+			"result": {
+				"__typename": "Tweet",
+				"rest_id": "2108213283144810958",
+				"details": {
+					"created_at_ms": 1762500000000,
+					"display_text_range": [0, 23],
+					"full_text": "https://t.co/infiniteSaaS",
+					"cashtag_entities": [],
+					"hashtag_entities": [],
+					"smarttags": []
+				},
+				"core": {
+					"user_results": {
+						"result": {
+							"__typename": "User",
+							"rest_id": "155204111",
+							"core": {
+								"name": "Satya Nadella",
+								"screen_name": "satyanadella"
+							},
+							"avatar": {
+								"image_url": "https://pbs.twimg.com/profile_images/1/avatar_normal.jpg"
+							},
+							"verification": {
+								"is_blue_verified": true
+							}
+						}
+					}
+				},
+				"counts": {
+					"reply_count": 42,
+					"retweet_count": 120,
+					"favorite_count": 8400,
+					"quote_count": 18,
+					"bookmark_count": 900
+				},
+				"views": {
+					"count": "1200000"
+				},
+				"media_entities2": [],
+				"legacy": {
+					"lang": "en"
+				},
+				"article": {
+					"article_results": {
+						"result": {
+							"rest_id": "2108213283144810001",
+							"title": "The Infinite SaaS Factory",
+							"preview_text": "The opportunity is to reinvent systems of record for an agentic world.",
+							"content_state": {
+								"blocks": [
+									{
+										"key": "a1",
+										"text": "The Infinite SaaS Factory",
+										"type": "header-one",
+										"inline_style_ranges": [],
+										"entity_ranges": []
+									},
+									{
+										"key": "a2",
+										"text": "The opportunity is to reinvent systems of record for an agentic world, not just build new experiences on top of them.",
+										"type": "unstyled",
+										"inline_style_ranges": [],
+										"entity_ranges": []
+									},
+									{
+										"key": "a3",
+										"text": "Read more here.",
+										"type": "unstyled",
+										"inline_style_ranges": [],
+										"entity_ranges": [
+											{
+												"key": 0,
+												"offset": 10,
+												"length": 4
+											}
+										]
+									},
+									{
+										"key": "a4",
+										"text": "Why it matters",
+										"type": "header-two",
+										"inline_style_ranges": [],
+										"entity_ranges": []
+									},
+									{
+										"key": "a5",
+										"text": "Agents need a substrate",
+										"type": "unordered-list-item",
+										"inline_style_ranges": [],
+										"entity_ranges": []
+									},
+									{
+										"key": "a6",
+										"text": "Software eats the world; agents eat software.",
+										"type": "blockquote",
+										"inline_style_ranges": [],
+										"entity_ranges": []
+									},
+									{
+										"key": "a7",
+										"text": " ",
+										"type": "atomic",
+										"inline_style_ranges": [],
+										"entity_ranges": [
+											{
+												"key": 1,
+												"offset": 0,
+												"length": 1
+											}
+										]
+									}
+								],
+								"entity_map": [
+									{
+										"key": 0,
+										"value": {
+											"type": "LINK",
+											"mutability": "MUTABLE",
+											"data": {
+												"url": "https://example.com/infinite"
+											}
+										}
+									},
+									{
+										"key": 1,
+										"value": {
+											"type": "MEDIA",
+											"mutability": "IMMUTABLE",
+											"data": {
+												"media_items": [
+													{
+														"local_media_id": "1",
+														"media_category": "DraftTweetImage",
+														"media_id": "3_img1"
+													}
+												]
+											}
+										}
+									}
+								]
+							},
+							"media_entities": [
+								{
+									"media_key": "3_cover",
+									"media_id": "3_cover",
+									"media_info": {
+										"__typename": "ApiImage",
+										"original_img_url": "https://pbs.twimg.com/media/ARTICLE_COVER.jpg"
+									}
+								},
+								{
+									"media_key": "3_img1",
+									"media_id": "3_img1",
+									"media_info": {
+										"__typename": "ApiImage",
+										"original_img_url": "https://pbs.twimg.com/media/ARTICLE_BODY.jpg"
+									}
+								}
+							],
+							"cover_media_results": {
+								"result": {
+									"media_key": "3_cover",
+									"media_info": {
+										"__typename": "ApiImage",
+										"original_img_url": "https://pbs.twimg.com/media/ARTICLE_COVER.jpg"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

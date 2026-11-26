@@ -94,6 +94,51 @@ window.addEventListener("arsip:net", (event) => {
 });
 
 /**
+ * New x-web inlines the initial API payload in `<script>` tags and
+ * removes those nodes once React hydrates. Capture their text from
+ * `document_start` so the scrape still has the server data later.
+ */
+const MAX_SSR_SCRIPT_CHARS = 300_000;
+/** @type {string[]} */
+const ssrScriptTexts = [];
+const ssrScriptSeen = new Set();
+let ssrScriptChars = 0;
+
+/**
+ * @param {HTMLScriptElement} script
+ */
+function rememberSsrScript(script) {
+	const text = script.textContent ?? "";
+	if (text.length < 200 || ssrScriptSeen.has(text)) {
+		return;
+	}
+	if (ssrScriptChars + text.length > MAX_SSR_SCRIPT_CHARS) {
+		return;
+	}
+	ssrScriptSeen.add(text);
+	ssrScriptTexts.push(text);
+	ssrScriptChars += text.length;
+}
+
+if (typeof MutationObserver === "function") {
+	const ssrObserver = new MutationObserver((records) => {
+		for (const record of records) {
+			for (const node of record.addedNodes) {
+				if (node instanceof HTMLScriptElement) {
+					// The parser may still be filling script.textContent when
+					// the node is inserted; a microtask reads the finished text.
+					queueMicrotask(() => rememberSsrScript(node));
+				}
+			}
+		}
+	});
+	ssrObserver.observe(document, { childList: true, subtree: true });
+	window.addEventListener("load", () => ssrObserver.disconnect(), {
+		once: true,
+	});
+}
+
+/**
  * @returns {Record<string, unknown>[]} Newest-first, within budget.
  */
 function trimNetLog() {
@@ -298,8 +343,9 @@ async function runScrape(autoScroll, videoMode, skipPromoted) {
 		skipPromoted,
 	);
 	// Consume-then-clear: bodies captured while reading this thread ride
-	// along, but must never leak into the next download.
-	const api = timelineApiBodies();
+	// along, but must never leak into the next download. New x-web inlines
+	// the initial payload in the page, so the DOM is a second source.
+	const api = [...new Set([...timelineApiBodies(), ...ssrApiBodies()])];
 	netLog.length = 0;
 	return reply(MESSAGE_TYPES.SCRAPE_DONE, {
 		tweets,
@@ -439,6 +485,24 @@ function timelineApiBodies() {
 		}
 	}
 	return bodies;
+}
+
+/**
+ * API payloads inlined by the new x-web SSR. Read from the DOM at scrape
+ * time; the fetch/XHR hook never sees these responses.
+ *
+ * @returns {string[]}
+ */
+function ssrApiBodies() {
+	try {
+		const adapter =
+			/** @type {{ ssrPayloads?: (doc: Document, extraSources?: string[]) => string[] } | undefined} */ (
+				globalThis.XAdapter
+			);
+		return adapter?.ssrPayloads?.(document, ssrScriptTexts) ?? [];
+	} catch {
+		return [];
+	}
 }
 
 /**

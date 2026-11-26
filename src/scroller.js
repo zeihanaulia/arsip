@@ -143,7 +143,7 @@ async function mountLazyMedia(root, options = {}) {
 function findScrollContainers(doc) {
 	const /** @type {Element[]} */ targets = [];
 	if (doc === document) {
-		const first = document.querySelector('article[data-testid="tweet"]');
+		const first = globalThis.XAdapter.findTweetElements(document)[0];
 		let node = first?.parentElement ?? null;
 		while (node) {
 			if (

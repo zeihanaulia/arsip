@@ -20,20 +20,31 @@
  */
 
 const SELECTORS = {
-	article: ['article[data-testid="tweet"]', 'article[role="article"]'],
-	text: ['[data-testid="tweetText"]'],
+	article: [
+		'article[data-testid="tweet"]',
+		'article[role="article"]',
+		'article:has(a[href*="/status/"])',
+	],
+	text: ['[data-testid="tweetText"]', 'div[dir="auto"].whitespace-pre-wrap'],
 	userName: ['[data-testid="User-Name"]'],
 	time: ["time"],
 	statusLink: ['a[href*="/status/"]'],
 	labeled: ["[aria-label]"],
-	articleReader: ['[data-testid="twitterArticleReadView"]'],
+	articleReader: [
+		'[data-testid="twitterArticleReadView"]',
+		'[data-article-part="body"]',
+	],
 	articleTitle: [
 		'[data-testid="twitter-article-title"]',
 		'[data-testid="articleTitle"]',
+		'[data-article-part="title"]',
 		'h1[dir="ltr"]',
 		"h1",
 	],
-	articleRichText: ['[data-testid="twitterArticleRichTextView"]'],
+	articleRichText: [
+		'[data-testid="twitterArticleRichTextView"]',
+		'[data-article-part="body"]',
+	],
 };
 
 /**
@@ -82,6 +93,20 @@ function findTweetElements(root) {
 		}
 	}
 	return elements;
+}
+
+/**
+ * The tweet cell around an element, across old and new X markup. New
+ * tweets keep the `<article>` shell but drop every `data-testid`, so the
+ * status link is the stable signal.
+ *
+ * @param {Element} element
+ * @returns {Element | null}
+ */
+function closestTweetElement(element) {
+	return element.closest(
+		'article[data-testid="tweet"], article[role="article"], article:has(a[href*="/status/"])',
+	);
 }
 
 /**
@@ -152,11 +177,50 @@ function isPromoted(article, href) {
 }
 
 /**
+ * New x-web user block: no `User-Name` test id, but the avatar keeps a
+ * machine-readable `alt="@handle"` and the profile links repeat the
+ * handle. Name is the non-handle text inside those links.
+ *
+ * @param {ParentNode} article
+ * @returns {{ name: string, screenName: string, avatarUrl: string }}
+ */
+function parseNewUser(article) {
+	const avatar =
+		article.querySelector('img[alt^="@"][src*="profile_images"]') ??
+		article.querySelector('img[src*="profile_images"]');
+	const screenName = (avatar?.getAttribute("alt") ?? "").replace(/^@/, "");
+	let name = "";
+	if (screenName !== "") {
+		for (const link of article.querySelectorAll(`a[href="/${screenName}"]`)) {
+			const text = (link.textContent ?? "").trim();
+			if (text !== "" && !text.startsWith("@")) {
+				name = text;
+				break;
+			}
+		}
+	}
+	if (name === "") {
+		const bold = article.querySelector(
+			'div[class*="font-bold"][class*="text-body"]',
+		);
+		name = (bold?.textContent ?? "").trim();
+	}
+	return {
+		name,
+		screenName,
+		avatarUrl: avatar?.getAttribute("src") ?? "",
+	};
+}
+
+/**
  * @param {ParentNode} article
  * @returns {{ name: string, screenName: string, avatarUrl: string }}
  */
 function parseUser(article) {
 	const block = queryFirst(article, SELECTORS.userName);
+	if (!block) {
+		return parseNewUser(article);
+	}
 	const spans = [...(block?.querySelectorAll("span") ?? [])].map((s) =>
 		(s.textContent ?? "").trim(),
 	);
@@ -188,6 +252,36 @@ function parseMetrics(article) {
 }
 
 /**
+ * Old markup exposes `<time datetime>`. New x-web only renders the
+ * timestamp as the visible status-link text ("10:43 AM · Nov 26, 2026").
+ * Best-effort: parseable English-format text becomes ISO; anything else
+ * stays empty instead of inventing an instant.
+ *
+ * @param {Element} article
+ * @returns {string} ISO timestamp or "".
+ */
+function parseTimestamp(article) {
+	const machine =
+		queryFirst(article, SELECTORS.time)?.getAttribute("datetime") ?? "";
+	const machineParsed = Date.parse(machine);
+	if (!Number.isNaN(machineParsed)) {
+		return new Date(machineParsed).toISOString();
+	}
+	for (const link of article.querySelectorAll(SELECTORS.statusLink.join(","))) {
+		const text = (link.textContent ?? "").trim();
+		const match = /^(.+?)\s*·\s*(.+)$/.exec(text);
+		if (!match) {
+			continue;
+		}
+		const parsed = Date.parse(`${match[2]} ${match[1]}`);
+		if (!Number.isNaN(parsed)) {
+			return new Date(parsed).toISOString();
+		}
+	}
+	return "";
+}
+
+/**
  * @param {Element} article
  * @returns {RawTweet | null} Null when the tweet cannot be identified.
  */
@@ -196,14 +290,11 @@ function parseTweet(article) {
 	if (!id) {
 		return null;
 	}
-	const time =
-		queryFirst(article, SELECTORS.time)?.getAttribute("datetime") ?? "";
-	const parsed = Date.parse(time);
 	return {
 		id: id.id,
 		url: id.url,
 		text: (queryFirst(article, SELECTORS.text)?.textContent ?? "").trim(),
-		createdAt: Number.isNaN(parsed) ? "" : new Date(parsed).toISOString(),
+		createdAt: parseTimestamp(article),
 		user: parseUser(article),
 		media: collectMedia(article),
 		metrics: parseMetrics(article),
@@ -223,7 +314,7 @@ function collectMedia(article) {
 	const seen = new Set();
 	const /** @type {{ url: string, type: string }[]} */ media = [];
 	for (const img of article.querySelectorAll(
-		'img[src*="pbs.twimg.com/media"]',
+		'img[src*="pbs.twimg.com/media"], img[src*="pbs.twimg.com/amplify_video_thumb"], img[src*="pbs.twimg.com/ext_tw_video_thumb"]',
 	)) {
 		addMedia(media, seen, img.getAttribute("src") ?? "", "photo");
 	}
@@ -269,11 +360,11 @@ function articleIdFromUrl(pageUrl) {
 }
 
 /**
- * @param {Element} reader
+ * @param {ParentNode} root
  * @returns {string}
  */
-function articleTitleDom(reader) {
-	return (queryFirst(reader, SELECTORS.articleTitle)?.textContent ?? "").trim();
+function articleTitleDom(root) {
+	return (queryFirst(root, SELECTORS.articleTitle)?.textContent ?? "").trim();
 }
 
 /**
@@ -313,33 +404,140 @@ function articleBlockMarkdown(block) {
 	return text;
 }
 
+/** Block tags x-web renders from DraftJS in the new article reader. */
+const ARTICLE_BLOCK_TAGS = new Set([
+	"H1",
+	"H2",
+	"H3",
+	"H4",
+	"P",
+	"BLOCKQUOTE",
+	"LI",
+	"PRE",
+]);
+
 /**
- * Article body from the rendered reader. Prefers the DraftJS blocks so
- * headings/quotes survive; falls back to the rich-text node's text.
- * A leading block that merely repeats the title is dropped.
- *
- * @param {Element} reader
+ * @param {Element} element
  * @returns {string}
  */
-function articleBodyDom(reader) {
-	const rich = queryFirst(reader, SELECTORS.articleRichText) ?? reader;
+function visibleText(element) {
+	const text =
+		element instanceof HTMLElement ? element.innerText : element.textContent;
+	return (text ?? "").trim();
+}
+
+/**
+ * One semantic block from the new article reader to one Markdown line.
+ * Unknown tags stay plain so formatting is never invented.
+ *
+ * @param {Element} element
+ * @returns {string}
+ */
+function articleSemanticLine(element) {
+	const text = visibleText(element);
+	if (text === "") {
+		return "";
+	}
+	if (element.tagName === "H1") {
+		return `# ${text}`;
+	}
+	if (element.tagName === "H2") {
+		return `## ${text}`;
+	}
+	if (element.tagName === "H3") {
+		return `### ${text}`;
+	}
+	if (element.tagName === "H4") {
+		return `#### ${text}`;
+	}
+	if (element.tagName === "BLOCKQUOTE") {
+		return text
+			.split("\n")
+			.map((line) => `> ${line}`)
+			.join("\n");
+	}
+	if (element.tagName === "LI") {
+		return `- ${text}`;
+	}
+	if (element.tagName === "PRE") {
+		return `\`\`\`\n${text}\n\`\`\``;
+	}
+	return text;
+}
+
+/**
+ * Walks the new reader's semantic HTML without double-emitting text:
+ * a block element (li, blockquote, pre) owns its whole subtree.
+ *
+ * @param {Element} root
+ * @param {string[]} lines Mutated in place.
+ */
+function walkSemanticBlocks(root, lines) {
+	for (const child of root.children) {
+		if (ARTICLE_BLOCK_TAGS.has(child.tagName)) {
+			const line = articleSemanticLine(child);
+			if (line !== "") {
+				lines.push(line);
+			}
+			continue;
+		}
+		walkSemanticBlocks(child, lines);
+	}
+}
+
+/**
+ * Article body from the rendered reader. Old markup uses DraftJS block
+ * classes; new x-web renders semantic HTML (h1/h2/p/li/blockquote).
+ * A leading block that merely repeats the title is dropped.
+ *
+ * @param {Element} rich
+ * @param {string} [title]
+ * @returns {string}
+ */
+function articleBodyDom(rich, title = "") {
 	const blocks = [...rich.querySelectorAll(ARTICLE_BLOCK_SELECTOR)];
-	if (blocks.length === 0) {
-		return (rich.textContent ?? "").trim();
+	if (blocks.length > 0) {
+		/** @type {string[]} */
+		const lines = [];
+		for (const [index, block] of blocks.entries()) {
+			const line = articleBlockMarkdown(block);
+			if (line === "") {
+				continue;
+			}
+			if (index === 0 && line.replace(/^#\s*/, "") === title) {
+				continue;
+			}
+			lines.push(line);
+		}
+		return lines.join("\n\n");
 	}
-	const title = articleTitleDom(reader);
+	/** @type {string[]} */
 	const lines = [];
-	for (const [index, block] of blocks.entries()) {
-		const line = articleBlockMarkdown(block);
-		if (line === "") {
-			continue;
+	walkSemanticBlocks(rich, lines);
+	if (lines.length > 0) {
+		if ((lines[0] ?? "").replace(/^#+\s*/, "") === title) {
+			lines.shift();
 		}
-		if (index === 0 && line.replace(/^#\s*/, "") === title) {
-			continue;
-		}
-		lines.push(line);
+		return lines.join("\n\n");
 	}
-	return lines.join("\n\n");
+	return visibleText(rich);
+}
+
+/**
+ * Cover lives outside the new reader body, while old reader markup kept
+ * it inside. Body images are already covered by `collectMedia`.
+ *
+ * @param {ParentNode} doc
+ * @param {Element} reader
+ * @returns {{ url: string, type: string }[]}
+ */
+function collectArticleMedia(doc, reader) {
+	const media = collectMedia(reader);
+	const seen = new Set(media.map((item) => item.url));
+	for (const img of doc.querySelectorAll('[data-article-part="cover"] img')) {
+		addMedia(media, seen, img.getAttribute("src") ?? "", "photo");
+	}
+	return media;
 }
 
 /**
@@ -359,8 +557,9 @@ function parseArticleDom(doc, pageUrl) {
 	if (id === "") {
 		return null;
 	}
-	const title = articleTitleDom(reader);
-	const body = articleBodyDom(reader);
+	const rich = queryFirst(doc, SELECTORS.articleRichText) ?? reader;
+	const title = articleTitleDom(doc) || articleTitleDom(reader);
+	const body = articleBodyDom(rich, title);
 	const user = parseUser(doc);
 	const url = user.screenName
 		? `https://x.com/${user.screenName}/status/${id}`
@@ -370,7 +569,7 @@ function parseArticleDom(doc, pageUrl) {
 		url,
 		text: title === "" ? body : `# ${title}\n\n${body}`,
 		user,
-		media: collectMedia(reader),
+		media: collectArticleMedia(doc, reader),
 		metrics: parseMetrics(reader),
 		promoted: false,
 		isArticle: true,
@@ -495,7 +694,7 @@ function findTextExpanders(root) {
 		if ((el.textContent ?? "").trim().toLowerCase() !== "show more") {
 			continue;
 		}
-		if (!el.closest('article[data-testid="tweet"]')) {
+		if (!closestTweetElement(el)) {
 			continue;
 		}
 		expanders.push(el);
@@ -532,6 +731,139 @@ function findExpandButtons(root) {
  */
 function conversationIdFromUrl(pageUrl) {
 	return /\/status\/(\d+)/.exec(pageUrl ?? "")?.[1] ?? "";
+}
+
+/**
+ * Markers that separate a real API payload string from ordinary JS.
+ * Unquoted on purpose: the inline script stores the JSON escaped as
+ * `\"tweet_result_by_rest_id\"`, so a quoted marker never matches the
+ * raw script text.
+ */
+const SSR_MARKERS = [
+	"tweet_result_by_rest_id",
+	"threaded_conversation_with_injections_v2",
+	"article_results",
+];
+
+/**
+ * Decoded string literals from inline JS. New x-web embeds API responses
+ * as escaped JSON string values (e.g. `value:"{\"data\":...}"`), so
+ * reading them needs no eval — just unescape and JSON.parse.
+ *
+ * @param {string} source
+ * @returns {string[]}
+ */
+function jsStringLiterals(source) {
+	const out = [];
+	let index = 0;
+	while (index < source.length) {
+		if (source[index] !== '"') {
+			index += 1;
+			continue;
+		}
+		let raw = "";
+		let cursor = index + 1;
+		for (; cursor < source.length; cursor += 1) {
+			const char = source[cursor];
+			if (char === "\\") {
+				raw += char + (source[cursor + 1] ?? "");
+				cursor += 1;
+				continue;
+			}
+			if (char === '"') {
+				break;
+			}
+			raw += char;
+		}
+		index = cursor + 1;
+		try {
+			out.push(JSON.parse(`"${raw}"`));
+		} catch {
+			// Non-JSON escapes (\xNN) are unrelated to API payloads.
+		}
+	}
+	return out;
+}
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isJsonObject(text) {
+	try {
+		const parsed = JSON.parse(text);
+		return typeof parsed === "object" && parsed !== null;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * @param {ParentNode} doc
+ * @param {string[]} extraSources
+ * @returns {string[]}
+ */
+function ssrSources(doc, extraSources) {
+	const sources = [];
+	const seen = new Set();
+	for (const script of doc.querySelectorAll("script:not([src])")) {
+		const source = script.textContent ?? "";
+		if (!seen.has(source)) {
+			seen.add(source);
+			sources.push(source);
+		}
+	}
+	for (const source of extraSources) {
+		if (!seen.has(source)) {
+			seen.add(source);
+			sources.push(source);
+		}
+	}
+	return sources;
+}
+
+/**
+ * @param {string} source
+ * @returns {string[]}
+ */
+function payloadsFromSource(source) {
+	const out = [];
+	for (const literal of jsStringLiterals(source)) {
+		if (
+			SSR_MARKERS.some((marker) => literal.includes(marker)) &&
+			isJsonObject(literal)
+		) {
+			out.push(literal);
+		}
+	}
+	return out;
+}
+
+/**
+ * API payloads embedded in the server-rendered page. New x-web does not
+ * fetch the initial TweetDetail/TweetResultByRestId response — it inlines
+ * the same JSON in inline scripts, invisible to the fetch/XHR hook.
+ *
+ * @param {ParentNode} [doc]
+ * @param {string[]} [extraSources] Inline-script texts captured before
+ *   hydration removed their nodes (content.js observer).
+ * @returns {string[]} JSON strings ready for x-graphql.js.
+ */
+function ssrPayloads(doc, extraSources = []) {
+	const out = [];
+	const seen = new Set();
+	for (const source of ssrSources(doc ?? document, extraSources)) {
+		if (!SSR_MARKERS.some((marker) => source.includes(marker))) {
+			continue;
+		}
+		for (const literal of payloadsFromSource(source)) {
+			if (!seen.has(literal)) {
+				seen.add(literal);
+				out.push(literal);
+			}
+		}
+	}
+	return out;
 }
 
 /**
@@ -577,6 +909,7 @@ function scrapeRaw(doc, pageUrl = "") {
 }
 
 globalThis.XAdapter = {
+	closestTweetElement,
 	conversationIdFromUrl,
 	findExpandButtons,
 	findTextExpanders,
@@ -585,4 +918,5 @@ globalThis.XAdapter = {
 	parseCount,
 	parseTweet,
 	scrapeRaw,
+	ssrPayloads,
 };

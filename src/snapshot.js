@@ -56,7 +56,10 @@ export function assembleSnapshot(
  * @returns {import("./model.js").Tweet[]}
  */
 export function assignThreadRelations(tweets, sourceUrl) {
-	const fromUrl = /\/status\/(\d+)/.exec(sourceUrl ?? "")?.[1] ?? "";
+	const fromUrl =
+		/\/status\/(\d+)/.exec(sourceUrl ?? "")?.[1] ??
+		/\/article\/(\d+)/.exec(sourceUrl ?? "")?.[1] ??
+		"";
 	const conversationId = fromUrl !== "" ? fromUrl : (tweets[0]?.id ?? "");
 	return (tweets ?? []).map((tweet) => {
 		const isCertainRoot = fromUrl !== "" && tweet.id === conversationId;

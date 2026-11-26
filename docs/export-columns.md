@@ -12,7 +12,7 @@ Aturan: field tanpa sumber DOM diisi kosong. Angka tidak pernah dikarang.
 | Media URLs | `localPath` bila ter-download, else URL asli; multi dipisah spasi | — |
 | Media Types | `photo` / `video` / `captions`, dipisah spasi | `captions` tambahan milik kita (track subtitle) |
 | Media Count | jumlah item media | — |
-| Created At | `tweet.createdAt` (ISO dari `<time datetime>`) | kosong bila tidak ada di DOM |
+| Created At | `tweet.createdAt` (ISO): API `details.created_at_ms` / `legacy.created_at` / article `metadata.first_published_at_secs`; DOM fallback `<time datetime>` atau teks timestamp-link absolut | Kosong bila hanya tersedia waktu relatif ("17h") — tidak ditebak |
 | Conversation Id | dari URL thread, fallback tweet pertama | `inferred` bila fallback |
 | In Reply To Status Id | `tweet.replyTo` | null bila tidak diketahui (jangan baca posisi sebagai parent) |
 | In Reply To User Id | — | **kosong, tidak ada di DOM** |

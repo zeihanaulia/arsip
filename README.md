@@ -40,15 +40,26 @@ Video yang tidak bisa diambil bytes-nya (stream/blob player) dicatat jujur di ma
 ## Batasan dikenal
 
 - DOM X sering berubah — selector diisolasi di `src/x-adapter.js` dengan fallback.
+- Sejak Nov 2026 X memakai app `x-web` (SSR): tweet tidak lagi punya
+  `data-testid`. Adapter memakai `<article>` dengan link `/status/`, utility
+  class teks, avatar `alt="@handle"`, dan `aria-label` metrics. Payload awal
+  ditanam di `<script>` inline lalu dihapus saat hydration; content script
+  menangkapnya sejak `document_start` lewat MutationObserver (tanpa `eval`).
+- Timestamp balasan sering hanya tampil relatif ("17h"). `createdAt` presisi
+  diisi dari payload SSR/API bila tersedia; DOM-only yang relatif dibiarkan
+  kosong, bukan ditebak.
 - Video HLS/blob player X tidak bisa di-fetch jadi file — poster + URL + alasan dicatat (rencana jangka panjang: backlog B1 intersepsi network).
 - Caption video hanya kalau DOM menyediakannya (`<track>`); umumnya tidak ada di X.
 - Thread raksasa dibatasi (40 batch / 300 tweet / ~21MB per file media).
 - X Article (long-form) didukung: body root di-render dari payload GraphQL
-  `article.article_results.result` di `TweetDetail` atau `TweetResultByRestId`,
-  dan/atau reader DOM. Root artikel selalu dipindah ke urutan pertama. Kalau
-  kedua payload tidak tertangkap dan reader belum ter-mount, root hanya berisi
-  teks pendek — reload tab lalu download ulang. Warning "Root tweet not captured"
-  hanya muncul kalau root sama sekali tidak ada.
+  `article.article_results.result` di `TweetDetail` atau `TweetResultByRestId`
+  (termasuk DraftJS snake_case app baru), dan/atau reader DOM baru
+  `[data-article-part="title|byline|body|cover"]`. `createdAt` artikel
+  fallback ke `article.metadata.first_published_at_secs`. Root artikel selalu
+  dipindah ke urutan pertama. Kalau kedua payload tidak tertangkap dan reader
+  belum ter-mount, root hanya berisi teks pendek — reload tab lalu download
+  ulang. Warning "Root tweet not captured" hanya muncul kalau root sama sekali
+  tidak ada.
 
 ## Develop
 

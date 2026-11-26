@@ -85,21 +85,44 @@ function timelineEntries(node) {
 }
 
 /**
- * Root entries carry itemContent directly; thread entries nest items
- * under content.items[].item.itemContent.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasTweetResults(value) {
+	return (
+		typeof value === "object" && value !== null && "tweet_results" in value
+	);
+}
+
+/**
+ * Old entries carry `itemContent` directly (root) or under
+ * `content.items[].item.itemContent` (thread). New x-web adds one more
+ * `content` hop: `content.content` and `content.items[].item.content`.
  *
  * @param {unknown} entry
  * @returns {unknown[]}
  */
 function itemContents(entry) {
 	const content = asRecord(asRecord(entry).content);
-	if (content.itemContent && typeof content.itemContent === "object") {
-		return [content.itemContent];
+	/** @type {unknown[]} */
+	const out = [];
+	if (hasTweetResults(content.itemContent)) {
+		out.push(content.itemContent);
+	}
+	if (hasTweetResults(content)) {
+		out.push(content);
 	}
 	const items = Array.isArray(content.items) ? content.items : [];
-	return items
-		.map((item) => asRecord(asRecord(item).item).itemContent)
-		.filter((itemContent) => !!itemContent);
+	for (const item of items) {
+		const inner = asRecord(asRecord(item).item);
+		if (hasTweetResults(inner.itemContent)) {
+			out.push(inner.itemContent);
+		}
+		if (hasTweetResults(inner.content)) {
+			out.push(inner.content);
+		}
+	}
+	return out;
 }
 
 /**
@@ -108,28 +131,33 @@ function itemContents(entry) {
  */
 function tweetResult(itemContent) {
 	const result = asRecord(asRecord(itemContent).tweet_results).result;
-	if (!result || typeof result !== "object") {
-		return null;
-	}
 	const record = /** @type {Record<string, unknown>} */ (result);
-	return record.__typename === "Tweet" ? record : null;
+	if (record.__typename === "Tweet") {
+		return record;
+	}
+	const nested = asRecord(record.tweet);
+	return nested.__typename === "Tweet" ? nested : null;
 }
 
 /**
  * `TweetResultByRestId` returns the focal tweet directly under
- * `data.tweetResult.result` instead of a timeline entry. Article roots
- * are often fetched this way before the conversation timeline loads.
+ * `data.tweetResult.result` (old) or `data.tweet_result_by_rest_id.result`
+ * (new x-web) instead of a timeline entry. Article roots are often
+ * fetched this way before the conversation timeline loads.
  *
  * @param {unknown} payload
  * @returns {Record<string, unknown> | null}
  */
 function directTweetResult(payload) {
-	const result = asRecord(asRecord(asRecord(payload).data).tweetResult).result;
-	if (!result || typeof result !== "object") {
-		return null;
+	const data = asRecord(asRecord(payload).data);
+	const current = asRecord(data.tweet_result_by_rest_id).result;
+	const legacy = asRecord(data.tweetResult).result;
+	const record = asRecord(asRecord(current).__typename ? current : legacy);
+	if (record.__typename === "Tweet") {
+		return record;
 	}
-	const record = /** @type {Record<string, unknown>} */ (result);
-	return record.__typename === "Tweet" ? record : null;
+	const nested = asRecord(record.tweet);
+	return nested.__typename === "Tweet" ? nested : null;
 }
 
 /**
@@ -181,7 +209,8 @@ function parseUser(result) {
 		statusesCount: countOf(tweetCounts.tweets),
 		bannerUrl: textOf(banner.image_url),
 		location: textOf(location.location),
-		blueVerified: user.is_blue_verified === true,
+		blueVerified:
+			user.is_blue_verified === true || verification.is_blue_verified === true,
 		verified: verification.verified === true,
 		protected: asRecord(user.privacy).protected === true,
 		professionalType: textOf(professional.professional_type),
@@ -200,11 +229,15 @@ function parseUser(result) {
  * @returns {ApiMedia[]}
  */
 function parseMedia(result) {
+	const current = Array.isArray(result.media_entities2)
+		? result.media_entities2
+		: [];
 	const legacy = /** @type {Record<string, unknown>} */ (result.legacy ?? {});
 	const extended = /** @type {Record<string, unknown>} */ (
 		legacy.extended_entities ?? {}
 	);
-	const items = Array.isArray(extended.media) ? extended.media : [];
+	const legacyItems = Array.isArray(extended.media) ? extended.media : [];
+	const items = current.length > 0 ? current : legacyItems;
 	const /** @type {ApiMedia[]} */ media = [];
 	for (const raw of items) {
 		const item = /** @type {Record<string, unknown>} */ (raw ?? {});
@@ -286,7 +319,13 @@ function noteTextOf(result) {
  */
 function articleResultOf(result) {
 	const article = asRecord(result.article);
-	const articleResult = asRecord(asRecord(article.article_results).result);
+	const direct = asRecord(asRecord(article.article_results).result);
+	const nested = asRecord(direct.article);
+	const articleResult =
+		Object.keys(nested).length > 0 &&
+		(nested.title !== undefined || nested.content_state !== undefined)
+			? nested
+			: direct;
 	return Object.keys(articleResult).length > 0 ? articleResult : null;
 }
 
@@ -403,6 +442,25 @@ function articleLinkedText(text, entityRanges, entityMap) {
 }
 
 /**
+ * @param {Record<string, unknown>} block
+ * @returns {unknown[]}
+ */
+function articleBlockRanges(block) {
+	const ranges = block.entityRanges ?? block.entity_ranges;
+	return Array.isArray(ranges) ? ranges : [];
+}
+
+/**
+ * @param {Record<string, unknown>} entity
+ * @returns {unknown[]}
+ */
+function articleMediaItems(entity) {
+	const items =
+		asRecord(entity.data).mediaItems ?? asRecord(entity.data).media_items;
+	return Array.isArray(items) ? items : [];
+}
+
+/**
  * Atomic blocks carry media references; render each as an image so the
  * position inside the article survives. Non-media atomics fall back to
  * their plain text.
@@ -413,18 +471,16 @@ function articleLinkedText(text, entityRanges, entityMap) {
  * @returns {string}
  */
 function articleAtomicLine(block, entityMap, article) {
-	const ranges = Array.isArray(block.entityRanges) ? block.entityRanges : [];
 	const lines = [];
-	for (const raw of ranges) {
+	for (const raw of articleBlockRanges(block)) {
 		const entity = articleEntity(entityMap, asRecord(raw).key);
 		if (entity.type !== "MEDIA") {
 			continue;
 		}
-		const data = asRecord(entity.data);
-		const items = Array.isArray(data.mediaItems) ? data.mediaItems : [];
-		for (const rawItem of items) {
+		for (const rawItem of articleMediaItems(entity)) {
+			const item = asRecord(rawItem);
 			const info = asRecord(
-				findArticleMedia(article, "media_id", asRecord(rawItem).mediaId)
+				findArticleMedia(article, "media_id", item.mediaId ?? item.media_id)
 					.media_info,
 			);
 			if (typeof info.original_img_url === "string") {
@@ -450,7 +506,11 @@ function articleBlockMarkdown(rawBlock, entityMap, article) {
 	}
 	return articleBlockLine(
 		textOf(block.type),
-		articleLinkedText(text, block.entityRanges, entityMap),
+		articleLinkedText(
+			text,
+			block.entityRanges ?? block.entity_ranges,
+			entityMap,
+		),
 	);
 }
 
@@ -465,8 +525,13 @@ function articleBlockMarkdown(rawBlock, entityMap, article) {
 function renderArticleMarkdown(article) {
 	const state = asRecord(article.content_state);
 	const blocks = Array.isArray(state.blocks) ? state.blocks : [];
+	if (blocks.length === 0) {
+		return textOf(article.plain_text).trim();
+	}
 	return blocks
-		.map((block) => articleBlockMarkdown(block, state.entityMap, article))
+		.map((block) =>
+			articleBlockMarkdown(block, state.entityMap ?? state.entity_map, article),
+		)
 		.filter((line) => line !== "")
 		.join("\n\n");
 }
@@ -498,11 +563,23 @@ function articleMedia(article) {
  * @returns {string}
  */
 function articleCoverUrl(article) {
+	const direct = textOf(
+		asRecord(asRecord(asRecord(article.cover_media_results).result).media_info)
+			.original_img_url,
+	);
+	if (direct !== "") {
+		return direct;
+	}
 	const cover = asRecord(article.cover_media);
-	if (typeof cover.media_key !== "string" || cover.media_key === "") {
+	const key = cover.media_key ?? cover.media_id;
+	if (typeof key !== "string" || key === "") {
 		return "";
 	}
-	const media = findArticleMedia(article, "media_key", cover.media_key);
+	const media = findArticleMedia(
+		article,
+		typeof cover.media_key === "string" ? "media_key" : "media_id",
+		key,
+	);
 	return textOf(asRecord(media.media_info).original_img_url);
 }
 
@@ -550,47 +627,133 @@ function articleFullText(article) {
 }
 
 /**
+ * New x-web appends the media/attachment t.co URL to `details.full_text`
+ * and exposes the human-visible span as `display_text_range`. Keep the
+ * leading mention (thread context) but drop a trailing attachment URL.
+ *
+ * @param {string} text
+ * @param {unknown} displayRange
+ * @returns {string}
+ */
+function trimTrailingMediaUrl(text, displayRange) {
+	const range = Array.isArray(displayRange) ? displayRange : [];
+	const end = countOf(range[1]);
+	if (end >= 0 && end < text.length) {
+		const tail = text.slice(end).trim();
+		if (/^https:\/\/t\.co\/\w+$/.test(tail)) {
+			return text.slice(0, end).trimEnd();
+		}
+	}
+	return text;
+}
+
+/**
+ * Tweet payloads carry `created_at_ms`; old payloads carry
+ * `legacy.created_at`. Article-only payloads expose the publication time
+ * as `article.metadata.first_published_at_secs` (seconds) instead.
+ *
+ * @param {Record<string, unknown>} details
+ * @param {Record<string, unknown>} legacy
+ * @param {Record<string, unknown> | null} article
+ * @returns {string}
+ */
+function tweetCreatedAt(details, legacy, article) {
+	const millis = countOf(details.created_at_ms);
+	if (millis > 0) {
+		return new Date(millis).toISOString();
+	}
+	const parsed = Date.parse(textOf(legacy.created_at));
+	if (!Number.isNaN(parsed)) {
+		return new Date(parsed).toISOString();
+	}
+	const metadata = asRecord(asRecord(article).metadata);
+	const seconds = countOf(
+		metadata.first_published_at_secs ?? metadata.created_at_secs,
+	);
+	return seconds > 0 ? new Date(seconds * 1000).toISOString() : "";
+}
+
+/**
+ * @param {{ title: string, text: string } | null} article
+ * @param {string} note
+ * @param {Record<string, unknown>} details
+ * @param {Record<string, unknown>} legacy
+ * @returns {string}
+ */
+function tweetTextOf(article, note, details, legacy) {
+	if (article) {
+		return articleFullText(article);
+	}
+	if (note !== "") {
+		return note;
+	}
+	const detailsText = trimTrailingMediaUrl(
+		textOf(details.full_text),
+		details.display_text_range,
+	);
+	return detailsText !== "" ? detailsText : textOf(legacy.full_text);
+}
+
+/**
+ * @param {Record<string, unknown>} counts
+ * @param {Record<string, unknown>} legacy
+ * @param {Record<string, unknown>} views
+ * @returns {ApiTweet["metrics"]}
+ */
+function tweetMetrics(counts, legacy, views) {
+	return {
+		replies: countOf(counts.reply_count ?? legacy.reply_count),
+		reposts: countOf(counts.retweet_count ?? legacy.retweet_count),
+		likes: countOf(counts.favorite_count ?? legacy.favorite_count),
+		quotes: countOf(counts.quote_count ?? legacy.quote_count),
+		bookmarks: countOf(counts.bookmark_count ?? legacy.bookmark_count),
+		views: countOf(views.count),
+	};
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @param {Record<string, unknown>} legacy
+ * @returns {string | null}
+ */
+function tweetReplyTo(result, legacy) {
+	return (
+		textOf(asRecord(result.reply_to_results).rest_id) ||
+		textOf(legacy.in_reply_to_status_id_str) ||
+		null
+	);
+}
+
+/**
  * @param {Record<string, unknown>} result
  * @returns {ApiTweet | null}
  */
 function parseTweetResult(result) {
 	const legacy = /** @type {Record<string, unknown>} */ (result.legacy ?? {});
-	const id = textOf(legacy.id_str);
+	const details = /** @type {Record<string, unknown>} */ (result.details ?? {});
+	const counts = /** @type {Record<string, unknown>} */ (result.counts ?? {});
+	const views = /** @type {Record<string, unknown>} */ (result.views ?? {});
+	const id = textOf(result.rest_id) || textOf(legacy.id_str);
 	if (id === "") {
 		return null;
 	}
 	const user = parseUser(result);
-	const createdAt = Date.parse(textOf(legacy.created_at));
-	const views = /** @type {Record<string, unknown>} */ (result.views ?? {});
-	const note = noteTextOf(result);
 	const articleRaw = articleResultOf(result);
 	const article = articleRaw ? parseArticle(articleRaw) : null;
-	const articleText = article ? articleFullText(article) : "";
 	return {
 		id,
-		text:
-			articleText !== ""
-				? articleText
-				: note !== ""
-					? note
-					: textOf(legacy.full_text),
+		text: tweetTextOf(article, noteTextOf(result), details, legacy),
 		url: user.screenName ? `https://x.com/${user.screenName}/status/${id}` : "",
-		createdAt: Number.isNaN(createdAt) ? "" : new Date(createdAt).toISOString(),
+		createdAt: tweetCreatedAt(details, legacy, articleRaw),
 		user,
 		media: [
 			...parseMedia(result),
 			...(articleRaw ? articleMedia(articleRaw) : []),
 		],
-		metrics: {
-			replies: countOf(legacy.reply_count),
-			reposts: countOf(legacy.retweet_count),
-			likes: countOf(legacy.favorite_count),
-			quotes: countOf(legacy.quote_count),
-			bookmarks: countOf(legacy.bookmark_count),
-			views: countOf(views.count),
-		},
-		conversationId: textOf(legacy.conversation_id_str),
-		replyTo: textOf(legacy.in_reply_to_status_id_str) || null,
+		metrics: tweetMetrics(counts, legacy, views),
+		conversationId:
+			textOf(legacy.conversation_id_str) || textOf(details.conversation_id_str),
+		replyTo: tweetReplyTo(result, legacy),
 		language: textOf(legacy.lang),
 		favorited: legacy.favorited === true,
 		retweeted: legacy.retweeted === true,
@@ -682,7 +845,11 @@ function mergeUser(domUser, apiUser) {
  * @returns {string}
  */
 function sourceStatusId(snapshot) {
-	return /\/status\/(\d+)/.exec(snapshot?.sourceUrl ?? "")?.[1] ?? "";
+	return (
+		/\/status\/(\d+)/.exec(snapshot?.sourceUrl ?? "")?.[1] ??
+		/\/article\/(\d+)/.exec(snapshot?.sourceUrl ?? "")?.[1] ??
+		""
+	);
 }
 
 /**
@@ -716,27 +883,67 @@ function promoteRoot(tweets, rootId) {
  * @returns {import("./model.js").ThreadSnapshot} The same snapshot.
  */
 export function mergeApiIntoSnapshot(snapshot, apiTweets) {
-	const seen = new Set((snapshot?.tweets ?? []).map((tweet) => tweet.id));
-	const byId = new Map();
-	for (const tweet of apiTweets ?? []) {
-		if (tweet?.id && !byId.has(tweet.id)) {
-			byId.set(tweet.id, tweet);
-		}
-	}
+	const byId = uniqueApiTweets(apiTweets);
 	for (const tweet of snapshot?.tweets ?? []) {
 		const api = byId.get(tweet.id);
 		if (api) {
 			applyApiTweet(tweet, api);
 		}
 	}
+	appendApiTweets(snapshot, byId);
+	const conversationId = sourceStatusId(snapshot);
+	fillConversationId(snapshot, conversationId);
+	promoteRoot(snapshot?.tweets ?? [], conversationId);
+	return snapshot;
+}
+
+/**
+ * First sighting of one id wins, so an older/root payload is never
+ * overwritten by a duplicate later body.
+ *
+ * @param {ApiTweet[]} apiTweets
+ * @returns {Map<string, ApiTweet>}
+ */
+function uniqueApiTweets(apiTweets) {
+	const byId = new Map();
+	for (const tweet of apiTweets ?? []) {
+		if (tweet?.id && !byId.has(tweet.id)) {
+			byId.set(tweet.id, tweet);
+		}
+	}
+	return byId;
+}
+
+/**
+ * @param {import("./model.js").ThreadSnapshot} snapshot Mutated in place.
+ * @param {Map<string, ApiTweet>} byId
+ */
+function appendApiTweets(snapshot, byId) {
+	const seen = new Set((snapshot?.tweets ?? []).map((tweet) => tweet.id));
 	for (const api of byId.values()) {
 		if (!seen.has(api.id)) {
 			seen.add(api.id);
 			snapshot.tweets.push(apiTweetToTweet(api));
 		}
 	}
-	promoteRoot(snapshot?.tweets ?? [], sourceStatusId(snapshot));
-	return snapshot;
+}
+
+/**
+ * New x-web payloads dropped `conversation_id_str`; the page URL still
+ * names the conversation, so API-added tweets inherit it.
+ *
+ * @param {import("./model.js").ThreadSnapshot} snapshot Mutated in place.
+ * @param {string} conversationId
+ */
+function fillConversationId(snapshot, conversationId) {
+	if (conversationId === "") {
+		return;
+	}
+	for (const tweet of snapshot?.tweets ?? []) {
+		if (tweet.conversationId === "") {
+			tweet.conversationId = conversationId;
+		}
+	}
 }
 
 /**

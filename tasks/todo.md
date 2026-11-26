@@ -87,7 +87,14 @@ Sumber: `docs/intent/x-thread-downloader.md` | Plan: `tasks/plan.md`
 ## Phase 7: X Article (long-form) sebagai root thread
 
 - [x] Task 18: Tangkap X Article (network `article_results` + reader DOM) jadi root tweet
+- [x] Task 18b: Adaptasi app x-web baru (SSR inline + DOM tanpa data-testid) — 2026-11-27
+  - [x] DOM baru: `<article>` + status link, text utility class, avatar `alt="@handle"`, metrics `aria-label`
+  - [x] SSR inline capture via MutationObserver `document_start` (script dihapus saat hydration)
+  - [x] Parser `tweet_result_by_rest_id`/`details`/`counts`/`reply_to_results`/`media_entities2` + article snake_case + `createdAt` fallback
+  - [x] Article reader DOM `[data-article-part]` (title/byline/body/cover)
+  - [x] Live check status + article (Chrome asli); 180 test + quality hijau
 - [ ] Checkpoint: X Article — manual E2E di thread artikel asli + review human
+- [ ] Manual pasca-Task 18b: reload extension, 1 download ZIP dari tab X
 
 ### Bugfix capture awal (2026-11-25)
 
